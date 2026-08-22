@@ -35,14 +35,16 @@ const seedRoles = async () => {
         update: {},
     });
 };
-const port = process.env.DEPLOY_ENV === "prod"
-    ? process.env.PORT_PROD
-    : process.env.PORT_UAT;
-app.listen(port, () => {
-    console.log("listening on port " + port);
-});
-app.get("/", async (req, res) => {
-    res.json({ message: `Oxford EMUP - ${process.env.DEPLOY_ENV ?? "dev"}` });
+// Railway automatically provides PORT
+const port = Number(process.env.PORT ||
+    (process.env.DEPLOY_ENV === "prod"
+        ? process.env.PORT_PROD
+        : process.env.PORT_UAT) ||
+    3000);
+app.get("/", (req, res) => {
+    res.json({
+        message: `Oxford EMUP - ${process.env.DEPLOY_ENV ?? "dev"}`,
+    });
 });
 (0, routes_1.useAuthRoutes)(app);
 (0, routes_1.useUserRoutes)(app);
@@ -56,9 +58,12 @@ const bootstrap = async () => {
         await config_1.prisma.$connect();
         await seedRoles();
         console.log("connected to postgres");
+        app.listen(port, "0.0.0.0", () => {
+            console.log(`listening on port ${port}`);
+        });
     }
     catch (error) {
-        console.log("error connecting to postgres:", error);
+        console.error("error connecting to postgres:", error);
         process.exit(1);
     }
 };
