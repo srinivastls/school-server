@@ -49,14 +49,7 @@ const seedRoles = async () => {
   });
 };
 
-// Railway automatically provides PORT
-const port = Number(
-  process.env.PORT ||
-    (process.env.DEPLOY_ENV === "prod"
-      ? process.env.PORT_PROD
-      : process.env.PORT_UAT) ||
-    3000
-);
+const port = Number(process.env.PORT || 3000);
 
 app.get("/", (req, res) => {
   res.json({
@@ -72,24 +65,20 @@ useStudentRoutes(app);
 useTransactionRoutes(app);
 useReportRoutes(app);
 
-
 const bootstrap = async () => {
   try {
     await prisma.$connect();
-
     console.log("connected to postgres");
 
     await seedRoles();
-
     console.log("roles seeded");
 
-    app.listen(port, () => {
+    app.listen(port, "0.0.0.0", () => {
       console.log(`listening on port ${port}`);
     });
   } catch (error) {
     console.error("startup failed:", error);
-
-    await prisma.$disconnect();
+    await prisma.$disconnect().catch(() => {});
     process.exit(1);
   }
 };
