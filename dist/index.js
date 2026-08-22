@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -27,33 +18,32 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Headers", "x-access-token, Origin, Content-Type, Accept");
     next();
 });
-const seedRoles = () => __awaiter(void 0, void 0, void 0, function* () {
-    yield config_1.prisma.role.upsert({
+const seedRoles = async () => {
+    await config_1.prisma.role.upsert({
         where: { name: types_1.Roles.admin },
         create: { name: types_1.Roles.admin },
         update: {},
     });
-    yield config_1.prisma.role.upsert({
+    await config_1.prisma.role.upsert({
         where: { name: types_1.Roles.superadmin },
         create: { name: types_1.Roles.superadmin },
         update: {},
     });
-    yield config_1.prisma.role.upsert({
+    await config_1.prisma.role.upsert({
         where: { name: types_1.Roles.owner },
         create: { name: types_1.Roles.owner },
         update: {},
     });
-});
+};
 const port = process.env.DEPLOY_ENV === "prod"
     ? process.env.PORT_PROD
     : process.env.PORT_UAT;
 app.listen(port, () => {
     console.log("listening on port " + port);
 });
-app.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    res.json({ message: `Oxford EMUP - ${(_a = process.env.DEPLOY_ENV) !== null && _a !== void 0 ? _a : "dev"}` });
-}));
+app.get("/", async (req, res) => {
+    res.json({ message: `Oxford EMUP - ${process.env.DEPLOY_ENV ?? "dev"}` });
+});
 (0, routes_1.useAuthRoutes)(app);
 (0, routes_1.useUserRoutes)(app);
 (0, routes_1.useClassRoutes)(app);
@@ -61,15 +51,15 @@ app.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 (0, routes_1.useStudentRoutes)(app);
 (0, routes_1.useTransactionRoutes)(app);
 (0, routes_1.useReportRoutes)(app);
-const bootstrap = () => __awaiter(void 0, void 0, void 0, function* () {
+const bootstrap = async () => {
     try {
-        yield config_1.prisma.$connect();
-        yield seedRoles();
+        await config_1.prisma.$connect();
+        await seedRoles();
         console.log("connected to postgres");
     }
     catch (error) {
         console.log("error connecting to postgres:", error);
         process.exit(1);
     }
-});
+};
 void bootstrap();

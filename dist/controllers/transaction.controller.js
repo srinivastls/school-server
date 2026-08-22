@@ -1,20 +1,10 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.transactionControllers = void 0;
 const config_1 = require("../config");
 const types_1 = require("../types");
 const utils_1 = require("../utils");
-const recordTxn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const recordTxn = async (req, res) => {
     try {
         const { amount, paymentMode, date, studentAdmissionNo, adminId, amountDetails, transactionId, } = req.body;
         if (!amount ||
@@ -28,7 +18,7 @@ const recordTxn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 .status(400)
                 .json({ message: "Some params missing in request body" });
         }
-        const student = yield config_1.prisma.student.findUnique({
+        const student = await config_1.prisma.student.findUnique({
             where: {
                 admissionNo: studentAdmissionNo,
             },
@@ -60,18 +50,16 @@ const recordTxn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
          *
          * Both succeed together or both are rolled back.
          */
-        const txn = yield config_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a;
-            var _b;
-            const createdTxn = yield tx.transaction.create({
+        const txn = await config_1.prisma.$transaction(async (tx) => {
+            const createdTxn = await tx.transaction.create({
                 data: {
                     amount: `${amount}`,
                     paymentMode,
                     date,
                     studentId: student.id,
                     adminId,
-                    transactionId: transactionId !== null && transactionId !== void 0 ? transactionId : null,
-                    classNumber: (_b = (_a = student.class) === null || _a === void 0 ? void 0 : _a.classNumber) !== null && _b !== void 0 ? _b : "(class deleted)",
+                    transactionId: transactionId ?? null,
+                    classNumber: student.class?.classNumber ?? "(class deleted)",
                     pendingAmount: newPendingAmount,
                     tieAmount: `${tie}`,
                     diaryAmount: `${diary}`,
@@ -82,7 +70,7 @@ const recordTxn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                     noteBookFeeAmount: `${noteBookFee}`,
                 },
             });
-            yield tx.student.update({
+            await tx.student.update({
                 where: {
                     admissionNo: studentAdmissionNo,
                 },
@@ -98,14 +86,14 @@ const recordTxn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 },
             });
             return createdTxn;
-        }));
+        });
         return res.status(200).json({
             amount: txn.amount,
             paymentMode: txn.paymentMode,
             date: txn.date,
             student: txn.studentId,
             adminId: txn.adminId,
-            transactionId: (_a = txn.transactionId) !== null && _a !== void 0 ? _a : undefined,
+            transactionId: txn.transactionId ?? undefined,
             classNumber: txn.classNumber,
             pendingAmount: txn.pendingAmount,
             amountDetails: {
@@ -123,15 +111,15 @@ const recordTxn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
-const getStudentTxns = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const getStudentTxns = async (req, res) => {
     try {
         if (!req.body.admissionNo) {
             return res
                 .status(400)
                 .json({ message: "admissionNo missing in request body" });
         }
-        const student = yield config_1.prisma.student.findUnique({
+        const student = await config_1.prisma.student.findUnique({
             where: {
                 admissionNo: req.body.admissionNo,
             },
@@ -145,7 +133,7 @@ const getStudentTxns = (req, res) => __awaiter(void 0, void 0, void 0, function*
          * This is important because after a student is promoted,
          * old transactions should still be visible.
          */
-        const txns = yield config_1.prisma.transaction.findMany({
+        const txns = await config_1.prisma.transaction.findMany({
             where: {
                 studentId: student.id,
             },
@@ -161,7 +149,7 @@ const getStudentTxns = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 createdAt: "desc",
             },
         });
-        const response = txns.map((txn) => { var _a; return ({
+        const response = txns.map((txn) => ({
             date: txn.date,
             classNumber: txn.classNumber,
             id: txn.id,
@@ -179,15 +167,15 @@ const getStudentTxns = (req, res) => __awaiter(void 0, void 0, void 0, function*
             },
             student: txn.student,
             adminId: txn.adminId,
-            transactionId: (_a = txn.transactionId) !== null && _a !== void 0 ? _a : undefined,
-        }); });
+            transactionId: txn.transactionId ?? undefined,
+        }));
         return res.status(200).json(response);
     }
     catch (error) {
         return (0, utils_1.handleErr)(error, res);
     }
-});
-const getTotalTxnAmount = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const getTotalTxnAmount = async (req, res) => {
     try {
         const { dates } = req.body;
         if (!dates) {
@@ -201,7 +189,7 @@ const getTotalTxnAmount = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 walletTotal: 0,
             });
         }
-        const txns = yield config_1.prisma.transaction.findMany({
+        const txns = await config_1.prisma.transaction.findMany({
             where: {
                 date: {
                     in: dates,
@@ -224,7 +212,7 @@ const getTotalTxnAmount = (req, res) => __awaiter(void 0, void 0, void 0, functi
     catch (error) {
         return (0, utils_1.handleErr)(error, res);
     }
-});
+};
 exports.transactionControllers = {
     recordTxn,
     getStudentTxns,

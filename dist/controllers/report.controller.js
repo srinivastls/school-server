@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -22,7 +13,7 @@ const getMonthOrDateFilter = (date, month, year) => {
     if (date) {
         return [date];
     }
-    return (0, utils_1.getMonthDateRange)(month !== null && month !== void 0 ? month : "1", year);
+    return (0, utils_1.getMonthDateRange)(month ?? "1", year);
 };
 const getTotalFee = (student, classDetails) => {
     const { tuitionFee, textBookFee, noteBookFee, diary, } = classDetails;
@@ -35,7 +26,7 @@ const getTotalFee = (student, classDetails) => {
         +belt.amount +
         +arrears.amount);
 };
-const getPercUnpaidStudents = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getPercUnpaidStudents = async (req, res) => {
     try {
         const { classNumber, perc } = req.query;
         if (!classNumber || !perc) {
@@ -48,7 +39,7 @@ const getPercUnpaidStudents = (req, res) => __awaiter(void 0, void 0, void 0, fu
                 message: "Invalid percentage",
             });
         }
-        const classDetails = yield config_1.prisma.class.findUnique({
+        const classDetails = await config_1.prisma.class.findUnique({
             where: {
                 classNumber,
             },
@@ -82,8 +73,8 @@ const getPercUnpaidStudents = (req, res) => __awaiter(void 0, void 0, void 0, fu
     catch (error) {
         return (0, utils_1.handleErr)(error, res);
     }
-});
-const getMonthOrDateReport = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const getMonthOrDateReport = async (req, res) => {
     try {
         const { classNumber, month, date, year } = req.body;
         if (!classNumber || !year || (!month && !date)) {
@@ -91,8 +82,8 @@ const getMonthOrDateReport = (req, res) => __awaiter(void 0, void 0, void 0, fun
                 message: "Request body is missing some params",
             });
         }
-        const dates = getMonthOrDateFilter(date !== null && date !== void 0 ? date : "", month !== null && month !== void 0 ? month : "", year);
-        const txns = yield config_1.prisma.transaction.findMany({
+        const dates = getMonthOrDateFilter(date ?? "", month ?? "", year);
+        const txns = await config_1.prisma.transaction.findMany({
             where: {
                 classNumber,
                 date: {
@@ -135,8 +126,8 @@ const getMonthOrDateReport = (req, res) => __awaiter(void 0, void 0, void 0, fun
     catch (error) {
         return (0, utils_1.handleErr)(error, res);
     }
-});
-const getStudentMonthOrDateReport = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const getStudentMonthOrDateReport = async (req, res) => {
     try {
         const { admissionNo, month, date, year } = req.body;
         if (!admissionNo || !year || (!month && !date)) {
@@ -144,7 +135,7 @@ const getStudentMonthOrDateReport = (req, res) => __awaiter(void 0, void 0, void
                 message: "Request body is missing some params",
             });
         }
-        const student = yield config_1.prisma.student.findUnique({
+        const student = await config_1.prisma.student.findUnique({
             where: {
                 admissionNo,
             },
@@ -154,8 +145,8 @@ const getStudentMonthOrDateReport = (req, res) => __awaiter(void 0, void 0, void
                 message: "Student not found",
             });
         }
-        const dates = getMonthOrDateFilter(date !== null && date !== void 0 ? date : "", month !== null && month !== void 0 ? month : "", year);
-        const txns = yield config_1.prisma.transaction.findMany({
+        const dates = getMonthOrDateFilter(date ?? "", month ?? "", year);
+        const txns = await config_1.prisma.transaction.findMany({
             where: {
                 studentId: student.id,
                 date: {
@@ -198,7 +189,7 @@ const getStudentMonthOrDateReport = (req, res) => __awaiter(void 0, void 0, void
     catch (error) {
         return (0, utils_1.handleErr)(error, res);
     }
-});
+};
 exports.reportControllers = {
     getPercUnpaidStudents,
     getMonthOrDateReport,

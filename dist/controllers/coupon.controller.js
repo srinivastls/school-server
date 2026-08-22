@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -19,7 +10,7 @@ const utils_1 = require("../utils");
 const dayjs_1 = __importDefault(require("dayjs"));
 const customParseFormat_1 = __importDefault(require("dayjs/plugin/customParseFormat"));
 dayjs_1.default.extend(customParseFormat_1.default);
-const createCoupon = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const createCoupon = async (req, res) => {
     const { code, discount, createdAt, classNumber } = req.body;
     if (!code || !discount || !createdAt || !classNumber) {
         return res
@@ -27,7 +18,7 @@ const createCoupon = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             .json({ message: "Some fields are missing in request body" });
     }
     try {
-        const classDocument = yield config_1.prisma.class.findUnique({
+        const classDocument = await config_1.prisma.class.findUnique({
             where: {
                 classNumber,
             },
@@ -37,7 +28,7 @@ const createCoupon = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 message: "Class doesn't exist",
             });
         }
-        yield config_1.prisma.coupon.create({
+        await config_1.prisma.coupon.create({
             data: {
                 code,
                 discount,
@@ -56,12 +47,12 @@ const createCoupon = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
-const getAllCoupons = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const getAllCoupons = async (req, res) => {
     try {
         const activeCouponsList = [];
         const appliedCouponsList = [];
-        const coupons = yield config_1.prisma.coupon.findMany({
+        const coupons = await config_1.prisma.coupon.findMany({
             include: {
                 class: true,
             },
@@ -102,10 +93,10 @@ const getAllCoupons = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         console.log("err", err);
         return (0, utils_1.handleErr)(err, res);
     }
-});
-const editCouponStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const editCouponStatus = async (req, res) => {
     try {
-        const coupon = yield config_1.prisma.coupon.findUnique({
+        const coupon = await config_1.prisma.coupon.findUnique({
             where: {
                 code: req.body.code,
             },
@@ -115,7 +106,7 @@ const editCouponStatus = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 message: "Coupon not found",
             });
         }
-        yield config_1.prisma.coupon.update({
+        await config_1.prisma.coupon.update({
             where: {
                 id: coupon.id,
             },
@@ -130,7 +121,7 @@ const editCouponStatus = (req, res) => __awaiter(void 0, void 0, void 0, functio
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 exports.couponControllers = {
     createCoupon,
     getAllCoupons,

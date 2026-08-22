@@ -1,20 +1,11 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.studentMiddlewares = void 0;
 const config_1 = require("../config");
 const utils_1 = require("../utils");
-const checkDuplicateStudent = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const checkDuplicateStudent = async (req, res, next) => {
     try {
-        const students = yield config_1.prisma.student.findMany({
+        const students = await config_1.prisma.student.findMany({
             where: {
                 OR: [
                     { admissionNo: req.body.admissionNo },
@@ -50,8 +41,8 @@ const checkDuplicateStudent = (req, res, next) => __awaiter(void 0, void 0, void
         return (0, utils_1.handleErr)(err, res);
     }
     next();
-});
-const checkSiblingsExist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const checkSiblingsExist = async (req, res, next) => {
     try {
         const siblings = req.body.siblings;
         if (!siblings) {
@@ -59,7 +50,7 @@ const checkSiblingsExist = (req, res, next) => __awaiter(void 0, void 0, void 0,
                 .status(400)
                 .json({ message: "siblings field missing in request body" });
         }
-        if (!(siblings === null || siblings === void 0 ? void 0 : siblings.length)) {
+        if (!siblings?.length) {
             next();
             return;
         }
@@ -86,7 +77,7 @@ const checkSiblingsExist = (req, res, next) => __awaiter(void 0, void 0, void 0,
         const admissionIdFilters = siblings.map((sibling) => ({
             admissionNo: sibling.admissionNo,
         }));
-        const siblingStudents = yield config_1.prisma.student.findMany({
+        const siblingStudents = await config_1.prisma.student.findMany({
             where: {
                 OR: admissionIdFilters,
             },
@@ -111,5 +102,5 @@ const checkSiblingsExist = (req, res, next) => __awaiter(void 0, void 0, void 0,
         return (0, utils_1.handleErr)(err, res);
     }
     next();
-});
+};
 exports.studentMiddlewares = { checkDuplicateStudent, checkSiblingsExist };

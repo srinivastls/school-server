@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -18,7 +9,7 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const config_1 = require("../config");
 const types_1 = require("../types");
 const utils_1 = require("../utils");
-const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const signup = async (req, res) => {
     try {
         const { name, email, password, roles, designation, adminId } = req.body;
         if (!name || !email || !password || !designation || !adminId) {
@@ -29,7 +20,7 @@ const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         // Find requested roles, or use admin by default
         let roleRecords;
         if (roles && roles.length > 0) {
-            roleRecords = yield config_1.prisma.role.findMany({
+            roleRecords = await config_1.prisma.role.findMany({
                 where: {
                     name: {
                         in: roles,
@@ -38,7 +29,7 @@ const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
         }
         else {
-            roleRecords = yield config_1.prisma.role.findMany({
+            roleRecords = await config_1.prisma.role.findMany({
                 where: {
                     name: types_1.Roles.admin,
                 },
@@ -49,7 +40,7 @@ const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 message: "Role not found. Please create roles first.",
             });
         }
-        yield config_1.prisma.user.create({
+        await config_1.prisma.user.create({
             data: {
                 name,
                 email,
@@ -70,11 +61,11 @@ const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
-const signin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const signin = async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = yield config_1.prisma.user.findUnique({
+        const user = await config_1.prisma.user.findUnique({
             where: {
                 email,
             },
@@ -112,15 +103,15 @@ const signin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
-const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const deleteUser = async (req, res) => {
     try {
         if (!req.body.email) {
             return res.status(400).json({
                 message: "Email field missing in request body",
             });
         }
-        yield config_1.prisma.user.delete({
+        await config_1.prisma.user.delete({
             where: {
                 email: req.body.email,
             },
@@ -132,8 +123,8 @@ const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
-const createSuperAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const createSuperAdmin = async (req, res) => {
     try {
         const { name, email, password, designation, adminId } = req.body;
         if (!name || !email || !password || !designation || !adminId) {
@@ -141,7 +132,7 @@ const createSuperAdmin = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 .status(400)
                 .json({ message: "Some fields are missing in request body" });
         }
-        const superAdminRole = yield config_1.prisma.role.findUnique({
+        const superAdminRole = await config_1.prisma.role.findUnique({
             where: {
                 name: types_1.Roles.superadmin,
             },
@@ -151,7 +142,7 @@ const createSuperAdmin = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 message: "Superadmin role not found. Please create it first.",
             });
         }
-        yield config_1.prisma.user.create({
+        await config_1.prisma.user.create({
             data: {
                 name,
                 email,
@@ -172,7 +163,7 @@ const createSuperAdmin = (req, res) => __awaiter(void 0, void 0, void 0, functio
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 exports.authController = {
     signin,
     signup,

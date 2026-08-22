@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.studentcontrollers = void 0;
 const config_1 = require("../config");
@@ -17,7 +8,6 @@ const utils_1 = require("../utils");
    HELPERS
 ============================================================ */
 const calculatePendingAmountSync = ({ student, classDetails, coupon, alreadyPaid = 0, }) => {
-    var _a;
     const { tuitionFee, textBookFee, noteBookFee, diary } = classDetails;
     const { tie, belt, arrears } = student;
     return `${Number(tuitionFee) +
@@ -27,10 +17,10 @@ const calculatePendingAmountSync = ({ student, classDetails, coupon, alreadyPaid
         Number(tie.amount) +
         Number(belt.amount) +
         Number(arrears.amount) -
-        Number((_a = coupon === null || coupon === void 0 ? void 0 : coupon.discount) !== null && _a !== void 0 ? _a : 0) -
+        Number(coupon?.discount ?? 0) -
         alreadyPaid}`;
 };
-const getPendingAmountAsync = (student, classDetails, coupon) => __awaiter(void 0, void 0, void 0, function* () {
+const getPendingAmountAsync = async (student, classDetails, coupon) => {
     if (!student.id) {
         return calculatePendingAmountSync({
             student,
@@ -39,7 +29,7 @@ const getPendingAmountAsync = (student, classDetails, coupon) => __awaiter(void 
             alreadyPaid: 0,
         });
     }
-    const transactions = yield config_1.prisma.transaction.findMany({
+    const transactions = await config_1.prisma.transaction.findMany({
         where: {
             studentId: student.id,
             classNumber: classDetails.classNumber,
@@ -55,7 +45,7 @@ const getPendingAmountAsync = (student, classDetails, coupon) => __awaiter(void 
         coupon,
         alreadyPaid,
     });
-});
+};
 const getUpdatedIndividualPendingAmount = ({ oldPendingAmount, oldAmount, newAmount, }) => {
     const newPendingAmount = Number(oldPendingAmount) +
         Number(newAmount) -
@@ -79,8 +69,7 @@ const parseSiblings = (siblings) => {
 /* ============================================================
    CREATE STUDENT
 ============================================================ */
-const createStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const createStudent = async (req, res) => {
     const { admissionNo, name, aadhaar, fatherName, dob, doj, phoneNo, classNumber, tie, belt, arrears, couponCode, siblings, adminId, } = req.body;
     if (!admissionNo ||
         !name ||
@@ -100,7 +89,7 @@ const createStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         });
     }
     try {
-        const classDetails = yield config_1.prisma.class.findUnique({
+        const classDetails = await config_1.prisma.class.findUnique({
             where: {
                 classNumber,
             },
@@ -112,7 +101,7 @@ const createStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         let coupon = null;
         if (couponCode) {
-            coupon = yield config_1.prisma.coupon.findUnique({
+            coupon = await config_1.prisma.coupon.findUnique({
                 where: {
                     code: couponCode,
                 },
@@ -133,7 +122,7 @@ const createStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 });
             }
         }
-        const siblingsFromDb = (_a = req.body.siblingStudentsFromDb) !== null && _a !== void 0 ? _a : [];
+        const siblingsFromDb = req.body.siblingStudentsFromDb ?? [];
         const formattedSiblingArray = createSiblingsArray(siblingsFromDb);
         const studentData = {
             admissionNo,
@@ -167,9 +156,9 @@ const createStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             classDetails,
             coupon,
         });
-        const student = yield config_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+        const student = await config_1.prisma.$transaction(async (tx) => {
             if (coupon) {
-                yield tx.coupon.update({
+                await tx.coupon.update({
                     where: {
                         id: coupon.id,
                     },
@@ -179,9 +168,12 @@ const createStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 });
             }
             return tx.student.create({
-                data: Object.assign(Object.assign({}, studentData), { pendingAmount }),
+                data: {
+                    ...studentData,
+                    pendingAmount,
+                },
             });
-        }));
+        });
         return res.status(200).json({
             message: "Student created successfully",
         });
@@ -189,13 +181,13 @@ const createStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 /* ============================================================
    GET STUDENTS BY CLASS
 ============================================================ */
-const getStudentsByClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getStudentsByClass = async (req, res) => {
     try {
-        const classDetails = yield config_1.prisma.class.findUnique({
+        const classDetails = await config_1.prisma.class.findUnique({
             where: {
                 classNumber: req.body.classNumber,
             },
@@ -205,7 +197,7 @@ const getStudentsByClass = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 message: "Class doesn't exist",
             });
         }
-        const students = yield config_1.prisma.student.findMany({
+        const students = await config_1.prisma.student.findMany({
             where: {
                 classId: classDetails.id,
             },
@@ -224,15 +216,13 @@ const getStudentsByClass = (req, res) => __awaiter(void 0, void 0, void 0, funct
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 /* ============================================================
    GET STUDENT BY COUPON
 ============================================================ */
-const getStudentByCoupon = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    var _b;
+const getStudentByCoupon = async (req, res) => {
     try {
-        const coupon = yield config_1.prisma.coupon.findUnique({
+        const coupon = await config_1.prisma.coupon.findUnique({
             where: {
                 code: req.body.code,
             },
@@ -242,7 +232,7 @@ const getStudentByCoupon = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 message: "Coupon doesn't exist",
             });
         }
-        const student = yield config_1.prisma.student.findFirst({
+        const student = await config_1.prisma.student.findFirst({
             where: {
                 couponId: coupon.id,
             },
@@ -278,8 +268,8 @@ const getStudentByCoupon = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 pendingAmount: student.arrearsPendingAmount,
             },
             pendingAmount: student.pendingAmount,
-            couponCode: (_a = student.coupon) === null || _a === void 0 ? void 0 : _a.code,
-            tcNo: (_b = student.tcNo) !== null && _b !== void 0 ? _b : undefined,
+            couponCode: student.coupon?.code,
+            tcNo: student.tcNo ?? undefined,
             siblings: parseSiblings(student.siblings),
             pendingTuitionFee: student.pendingTuitionFee,
             pendingNotebookFee: student.pendingNotebookFee,
@@ -291,20 +281,18 @@ const getStudentByCoupon = (req, res) => __awaiter(void 0, void 0, void 0, funct
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 /* ============================================================
    GET STUDENT
 ============================================================ */
-const getStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    var _b;
+const getStudent = async (req, res) => {
     if (!req.body.admissionNo) {
         return res.status(400).json({
             message: "Admission number missing in request body",
         });
     }
     try {
-        const student = yield config_1.prisma.student.findUnique({
+        const student = await config_1.prisma.student.findUnique({
             where: {
                 admissionNo: req.body.admissionNo,
             },
@@ -340,8 +328,8 @@ const getStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 pendingAmount: student.arrearsPendingAmount,
             },
             pendingAmount: student.pendingAmount,
-            couponCode: (_a = student.coupon) === null || _a === void 0 ? void 0 : _a.code,
-            tcNo: (_b = student.tcNo) !== null && _b !== void 0 ? _b : undefined,
+            couponCode: student.coupon?.code,
+            tcNo: student.tcNo ?? undefined,
             siblings: parseSiblings(student.siblings),
             pendingTuitionFee: student.pendingTuitionFee,
             pendingNotebookFee: student.pendingNotebookFee,
@@ -353,11 +341,11 @@ const getStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 /* ============================================================
    EDIT STUDENT
 ============================================================ */
-const editStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const editStudent = async (req, res) => {
     const { admissionNo, name, aadhaar, fatherName, dob, doj, phoneNo, classNumber, tie, belt, arrears, couponCode, oldAdmissionNo, siblings, } = req.body;
     if (!admissionNo ||
         !name ||
@@ -377,7 +365,7 @@ const editStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
     }
     try {
-        const oldStudent = yield config_1.prisma.student.findUnique({
+        const oldStudent = await config_1.prisma.student.findUnique({
             where: {
                 admissionNo,
             },
@@ -396,7 +384,7 @@ const editStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 message: "Cannot change admission number",
             });
         }
-        const classDetails = yield config_1.prisma.class.findUnique({
+        const classDetails = await config_1.prisma.class.findUnique({
             where: {
                 classNumber,
             },
@@ -410,7 +398,7 @@ const editStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (couponCode &&
             !oldStudent.couponId) {
             coupon =
-                yield config_1.prisma.coupon.findUnique({
+                await config_1.prisma.coupon.findUnique({
                     where: {
                         code: couponCode,
                     },
@@ -500,12 +488,11 @@ const editStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 amount: formattedFees.arrearsAmount,
             },
         };
-        const pendingAmount = yield getPendingAmountAsync(studentForCalculation, classDetails, coupon);
-        yield config_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a;
+        const pendingAmount = await getPendingAmountAsync(studentForCalculation, classDetails, coupon);
+        await config_1.prisma.$transaction(async (tx) => {
             if (coupon &&
                 !oldStudent.couponId) {
-                yield tx.coupon.update({
+                await tx.coupon.update({
                     where: {
                         id: coupon.id,
                     },
@@ -514,21 +501,29 @@ const editStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                     },
                 });
             }
-            yield tx.student.update({
+            await tx.student.update({
                 where: {
                     id: oldStudent.id,
                 },
-                data: Object.assign(Object.assign({ name,
+                data: {
+                    name,
                     aadhaar,
                     fatherName,
                     dob,
                     doj,
-                    phoneNo, classId: classDetails.id, couponId: coupon
+                    phoneNo,
+                    classId: classDetails.id,
+                    couponId: coupon
                         ? coupon.id
-                        : oldStudent.couponId, siblings: createSiblingsArray((_a = req.body
-                        .siblingStudentsFromDb) !== null && _a !== void 0 ? _a : []) }, formattedFees), { pendingAmount }),
+                        : oldStudent.couponId,
+                    siblings: createSiblingsArray(req.body
+                        .siblingStudentsFromDb ??
+                        []),
+                    ...formattedFees,
+                    pendingAmount,
+                },
             });
-        }));
+        });
         return res.status(200).json({
             message: "Student details edited successfully",
         });
@@ -536,13 +531,13 @@ const editStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 /* ============================================================
    GROUP STUDENTS BY CLASS
 ============================================================ */
-const groupStudentsByClassAndCount = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const groupStudentsByClassAndCount = async (req, res) => {
     try {
-        const groupedStudents = yield config_1.prisma.student.groupBy({
+        const groupedStudents = await config_1.prisma.student.groupBy({
             by: ["classId"],
             _count: {
                 id: true,
@@ -550,7 +545,7 @@ const groupStudentsByClassAndCount = (req, res) => __awaiter(void 0, void 0, voi
         });
         const responseData = [];
         for (const group of groupedStudents) {
-            const classDetails = yield config_1.prisma.class.findUnique({
+            const classDetails = await config_1.prisma.class.findUnique({
                 where: {
                     id: group.classId,
                 },
@@ -572,11 +567,11 @@ const groupStudentsByClassAndCount = (req, res) => __awaiter(void 0, void 0, voi
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 /* ============================================================
    PROMOTE / DEMOTE STUDENTS
 ============================================================ */
-const promoteDemote = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const promoteDemote = async (req, res) => {
     const { fromClass, toClass, } = req.body;
     if (!fromClass || !toClass) {
         return res.status(400).json({
@@ -584,7 +579,7 @@ const promoteDemote = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         });
     }
     try {
-        const fromClassDetails = yield config_1.prisma.class.findUnique({
+        const fromClassDetails = await config_1.prisma.class.findUnique({
             where: {
                 classNumber: fromClass,
             },
@@ -594,7 +589,7 @@ const promoteDemote = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 message: "Source class doesn't exist",
             });
         }
-        const toClassDetails = yield config_1.prisma.class.findUnique({
+        const toClassDetails = await config_1.prisma.class.findUnique({
             where: {
                 classNumber: toClass,
             },
@@ -604,7 +599,7 @@ const promoteDemote = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 message: "Target class doesn't exist",
             });
         }
-        const studentInTargetClass = yield config_1.prisma.student.findFirst({
+        const studentInTargetClass = await config_1.prisma.student.findFirst({
             where: {
                 classId: toClassDetails.id,
             },
@@ -614,7 +609,7 @@ const promoteDemote = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 message: "Target class has students already",
             });
         }
-        const students = yield config_1.prisma.student.findMany({
+        const students = await config_1.prisma.student.findMany({
             where: {
                 classId: fromClassDetails.id,
             },
@@ -622,7 +617,7 @@ const promoteDemote = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 coupon: true,
             },
         });
-        yield config_1.prisma.$transaction(students.map((student) => {
+        await config_1.prisma.$transaction(students.map((student) => {
             const studentData = {
                 tie: {
                     amount: student.tieAmount,
@@ -662,7 +657,7 @@ const promoteDemote = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 /* ============================================================
    EXPORTS
 ============================================================ */

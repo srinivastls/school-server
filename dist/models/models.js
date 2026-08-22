@@ -9,4 +9,4 @@ var Models;
     Models["Coupon"] = "Coupon";
     Models["Student"] = "Student";
     Models["Transaction"] = "Transaction";
-})(Models = exports.Models || (exports.Models = {}));
+})(Models || (exports.Models = Models = {}));

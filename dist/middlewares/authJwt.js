@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -22,7 +13,7 @@ const verifyToken = (req, res, next) => {
     const header = req.headers["x-access-token"];
     const token = typeof header === "string"
         ? header
-        : (header === null || header === void 0 ? void 0 : header.length)
+        : header?.length
             ? header[0]
             : undefined;
     if (!token) {
@@ -37,14 +28,14 @@ const verifyToken = (req, res, next) => {
         next();
     });
 };
-const isSuperAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const isSuperAdmin = async (req, res, next) => {
     try {
         //@ts-ignore
         const userId = req.userId;
         if (!userId) {
             return res.status(401).json({ message: "Unauthorized" });
         }
-        const user = yield config_2.prisma.user.findUnique({
+        const user = await config_2.prisma.user.findUnique({
             where: { id: userId },
             include: { roles: true },
         });
@@ -60,15 +51,15 @@ const isSuperAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
-const isOwner = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const isOwner = async (req, res, next) => {
     try {
         //@ts-ignore
         const userId = req.userId;
         if (!userId) {
             return res.status(401).json({ message: "Unauthorized" });
         }
-        const user = yield config_2.prisma.user.findUnique({
+        const user = await config_2.prisma.user.findUnique({
             where: { id: userId },
             include: { roles: true },
         });
@@ -84,5 +75,5 @@ const isOwner = (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
-});
+};
 exports.authJwt = { verifyToken, isSuperAdmin, isOwner };
