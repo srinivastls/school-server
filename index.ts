@@ -72,18 +72,24 @@ useStudentRoutes(app);
 useTransactionRoutes(app);
 useReportRoutes(app);
 
+
 const bootstrap = async () => {
   try {
     await prisma.$connect();
-    await seedRoles();
 
     console.log("connected to postgres");
 
-    app.listen(port, "0.0.0.0", () => {
+    await seedRoles();
+
+    console.log("roles seeded");
+
+    app.listen(port, () => {
       console.log(`listening on port ${port}`);
     });
   } catch (error) {
-    console.error("error connecting to postgres:", error);
+    console.error("startup failed:", error);
+
+    await prisma.$disconnect();
     process.exit(1);
   }
 };
