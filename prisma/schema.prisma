@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CouponStatus {
+  ACTIVE
+  APPLIED
+}
+
+enum RoleName {
+  admin
+  superadmin
+  owner
+}
+
+enum PaymentMode {
+  cash
+  wallet
+}
+
+model Class {
+  id          String @id @default(uuid())
+  classNumber String @unique
+  tuitionFee  String
+  textBookFee String
+  noteBookFee String
+  diary       String
+  year        String
+
+  coupons  Coupon[]
+  students Student[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("classes")
+}
+
+model Coupon {
+  id String @id @default(uuid())
+
+  code     String       @unique
+  discount String
+  status   CouponStatus @default(ACTIVE)
+
+  classId String?
+  class   Class?  @relation(fields: [classId], references: [id])
+
+  students Student[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("coupons")
+}
+
+model Student {
+  id String @id @default(uuid())
+
+  admissionNo String @unique
+  name        String
+  aadhaar     String @unique
+  fatherName  String
+  dob         String
+  doj         String
+  phoneNo     String
+
+  // Class relationship
+  classId String
+  class   Class  @relation(fields: [classId], references: [id])
+
+  // Coupon relationship
+  couponId String?
+  coupon   Coupon? @relation(fields: [couponId], references: [id])
+
+  tieAmount            String
+  tiePendingAmount     String
+  beltAmount           String
+  beltPendingAmount    String
+  arrearsAmount        String
+  arrearsPendingAmount String
+
+  pendingTuitionFee  String
+  pendingTextbookFee String
+  pendingNotebookFee String
+  pendingDiaryAmount String
+  pendingAmount      String
+
+  tcNo    String?
+  adminId String
+
+  siblings Json
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("students")
+}
+
+model User {
+  id          String @id @default(uuid())
+
+  name        String
+  email       String @unique
+  password    String
+  designation String
+  adminId     String @unique
+
+  roles       Role[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Role {
+  id        String   @id @default(uuid())
+  name      RoleName @unique
+
+  users     User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Transaction {
+  id            String      @id @default(uuid())
+
+  date          String
+  amount        String
+  pendingAmount String
+  paymentMode   PaymentMode
+
+  transactionId String?
+  classNumber   String
+  adminId       String
+
+  // Student relationship
+  studentId     String?
+  student       Student?    @relation(fields: [studentId], references: [id])
+
+  tieAmount     String
+  diaryAmount   String
+  beltAmount    String
+  arrearsAmount String
+
+  tuitionFeeAmount  String
+  textBookFeeAmount String
+  noteBookFeeAmount String
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("transactions")
+}
+
+

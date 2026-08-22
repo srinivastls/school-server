@@ -1,0 +1,1 @@
+DEPLOY_ENV=prod node dist/index.js

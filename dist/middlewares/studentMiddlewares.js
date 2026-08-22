@@ -1,0 +1,115 @@
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.studentMiddlewares = void 0;
+const config_1 = require("../config");
+const utils_1 = require("../utils");
+const checkDuplicateStudent = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const students = yield config_1.prisma.student.findMany({
+            where: {
+                OR: [
+                    { admissionNo: req.body.admissionNo },
+                    { aadhaar: req.body.aadhaar },
+                    ...(req.body.tcNo ? [{ tcNo: req.body.tcNo }] : []),
+                ],
+            },
+            select: {
+                admissionNo: true,
+                aadhaar: true,
+                tcNo: true,
+            },
+        });
+        if (students.length) {
+            let dupAdmissionNo = false, dupAadhaar = false, dupTcNo = false;
+            students.forEach((student) => {
+                if (student.admissionNo === req.body.admissionNo) {
+                    dupAdmissionNo = true;
+                }
+                if (student.aadhaar === req.body.aadhaar) {
+                    dupAadhaar = true;
+                }
+                if (student.tcNo !== "" && student.tcNo === req.body.tcNo) {
+                    dupTcNo = true;
+                }
+            });
+            return res.status(400).json({
+                message: `Duplicate${dupAdmissionNo ? " admission number" : ""}${dupAadhaar ? `${dupAdmissionNo ? ", " : " "}aadhaar` : ""}${dupTcNo ? `${dupAadhaar || dupAdmissionNo ? ", " : " "}TC No.` : ""}`,
+            });
+        }
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
+    next();
+});
+const checkSiblingsExist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const siblings = req.body.siblings;
+        if (!siblings) {
+            return res
+                .status(400)
+                .json({ message: "siblings field missing in request body" });
+        }
+        if (!(siblings === null || siblings === void 0 ? void 0 : siblings.length)) {
+            next();
+            return;
+        }
+        //check if admission number is smae for 2 or more siblings
+        const admissionNoExists = {};
+        for (const sibling of siblings) {
+            if (sibling.admissionNo === req.body.admissionNo) {
+                return res.status(400).json({
+                    message: "Sibling cannot have same admission ID as the student",
+                });
+            }
+            if (!admissionNoExists[sibling.admissionNo]) {
+                admissionNoExists[sibling.admissionNo] = true;
+            }
+            else {
+                return res
+                    .status(400)
+                    .json({ message: "Admission number of siblings are repeating" });
+            }
+        }
+        //find all students using or condition of admission ids
+        //if that array's length is equal to siblings length, then all sibling exists
+        //otherwise, some siblings do not exist
+        const admissionIdFilters = siblings.map((sibling) => ({
+            admissionNo: sibling.admissionNo,
+        }));
+        const siblingStudents = yield config_1.prisma.student.findMany({
+            where: {
+                OR: admissionIdFilters,
+            },
+            select: {
+                admissionNo: true,
+                name: true,
+            },
+        });
+        if (siblingStudents.length < siblings.length) {
+            //find which admission numbers are incorrect
+            const correctAdmissionNos = siblingStudents.map((sibling) => sibling.admissionNo);
+            const incorrectAdmissionNumbers = siblings
+                .filter((sibling) => !correctAdmissionNos.includes(sibling.admissionNo))
+                .map((sibling) => sibling.admissionNo);
+            return res.status(400).json({
+                message: `The following admission numbers for siblings are incorrect: ${incorrectAdmissionNumbers.join(", ")}`,
+            });
+        }
+        req.body.siblingStudentsFromDb = siblingStudents;
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
+    next();
+});
+exports.studentMiddlewares = { checkDuplicateStudent, checkSiblingsExist };
