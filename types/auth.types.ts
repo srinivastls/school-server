@@ -1,20 +1,79 @@
-import { Roles, UserType } from "./entities.types";
+import { RoleName } from "@prisma/client";
 
-export type AuthSignupRequest = Omit<UserType, "roles"> & {
+/* ============================================================
+   SIGN UP
+============================================================ */
+
+export type AuthSignupRequest = {
+  name: string;
+  email: string;
   password: string;
-  roles: Roles[];
+
+  role?: RoleName;
+
+  designation?: string;
+  phone?: string;
+  department?: string;
+  employeeId?: string;
+
+  schoolId?: string;
 };
 
-export type AuthSigninRequest = { email: string; password: string };
-export type AuthSigninResponse = Omit<UserType, "roles"> & {
+/* ============================================================
+   SIGN IN
+============================================================ */
+
+export type AuthSigninRequest = {
+  email: string;
+  password: string;
+
+  schoolId?: string;
+};
+
+/* ============================================================
+   SIGN IN RESPONSE
+============================================================ */
+
+export type AuthSigninResponse = {
   id: string;
+
   accessToken: string;
   accessTokenTTL: number;
-  roles: Roles[];
+
+  name: string;
+  email: string;
+
+  role: RoleName;
+
+  designation: string | null;
+
+  schoolId: string;
 };
 
-export type CreateSuperAdminRequest = Omit<UserType, "roles"> & {
+/* ============================================================
+   CREATE PLATFORM ADMIN
+============================================================ */
+
+export type CreateSuperAdminRequest = {
+  name: string;
+  email: string;
   password: string;
+
+  designation?: string;
+
+  /*
+   * Kept optional for backward compatibility.
+   * Platform admins normally do not belong to a school.
+   */
+  schoolId?: string;
 };
 
-export type DeleteUserRequest = { email: string };
+/* ============================================================
+   DELETE USER
+============================================================ */
+
+export type DeleteUserRequest = {
+  email: string;
+
+  schoolId?: string;
+};

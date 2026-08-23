@@ -19,24 +19,63 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 
 dayjs.extend(customParseFormat);
 
+/* ============================================================
+   HELPERS
+============================================================ */
+
+const getSchoolId = (req: any): string | undefined => {
+  return (
+    req.user?.schoolId ??
+    req.body?.schoolId ??
+    req.query?.schoolId
+  );
+};
+
+/* ============================================================
+   CREATE COUPON
+============================================================ */
+
 const createCoupon = async (
   req: RequestWithBody<CreateCouponRequest>,
   res: Response
 ) => {
-  const { code, discount, createdAt, classNumber } = req.body;
+  const {
+    code,
+    discount,
+    createdAt,
+    classNumber,
+    academicYearId,
+  } = req.body as any;
 
-  if (!code || !discount || !createdAt || !classNumber) {
-    return res
-      .status(400)
-      .json({ message: "Some fields are missing in request body" });
+  const schoolId = getSchoolId(req);
+
+  if (
+    !schoolId ||
+    !code ||
+    !discount ||
+    !createdAt ||
+    !classNumber ||
+    !academicYearId
+  ) {
+    return res.status(400).json({
+      message:
+        "schoolId, code, discount, createdAt, classNumber and academicYearId are required",
+    });
   }
 
   try {
-    const classDocument = await prisma.class.findUnique({
-      where: {
-        classNumber,
-      },
-    });
+    /* --------------------------------------------------------
+       FIND CLASS INSIDE THIS SCHOOL + ACADEMIC YEAR
+    -------------------------------------------------------- */
+
+    const classDocument =
+      await prisma.class.findFirst({
+        where: {
+          schoolId,
+          academicYearId,
+          classNumber,
+        },
+      });
 
     if (!classDocument) {
       return res.status(400).json({
@@ -44,95 +83,181 @@ const createCoupon = async (
       });
     }
 
-    await prisma.coupon.create({
-      data: {
-        code,
-        discount,
-        status: CouponStatus.ACTIVE,
-        class: {
-          connect: {
-            id: classDocument.id,
+    /* --------------------------------------------------------
+       CHECK DUPLICATE COUPON
+    -------------------------------------------------------- */
+
+    const existingCoupon =
+      await prisma.coupon.findUnique({
+        where: {
+          schoolId_code: {
+            schoolId,
+            code,
           },
         },
-      },
+      });
+
+    if (existingCoupon) {
+      return res.status(409).json({
+        message:
+          "Coupon with this code already exists in this school",
+      });
+    }
+
+    /* --------------------------------------------------------
+       CREATE COUPON
+    -------------------------------------------------------- */
+
+    await prisma.coupon.create({
+      data: {
+        schoolId,
+
+        code,
+        discount,
+
+        status:
+          CouponStatus.ACTIVE,
+
+        classId:
+          classDocument.id,
+
+        createdByUserId:
+          req.user?.id ?? null,
+      } as any,
     });
 
-    return res.status(200).json({
-      message: "Coupon created successfully",
+    return res.status(201).json({
+      message:
+        "Coupon created successfully",
     });
   } catch (err) {
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   GET ALL COUPONS
+============================================================ */
 
 const getAllCoupons = async (
   req: Request,
   res: Response<GetAllCouponsResponse>
 ) => {
   try {
+    const schoolId = getSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message: "schoolId is required",
+      });
+    }
+
     const activeCouponsList: CouponType[] = [];
     const appliedCouponsList: CouponType[] = [];
 
-    const coupons = await prisma.coupon.findMany({
-      include: {
-        class: true,
-      },
-    });
+    const coupons =
+      await prisma.coupon.findMany({
+        where: {
+          schoolId,
+        },
+        include: {
+          class: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
     coupons.forEach((coupon) => {
-      const { code, status, discount, createdAt, class: classDetails } =
-        coupon;
+      const {
+        code,
+        status,
+        discount,
+        createdAt,
+        class: classDetails,
+      } = coupon;
 
       if (classDetails) {
         const couponData: CouponType = {
           code,
           discount,
-          status: status as CouponStatus,
-          createdAt: dayjs(createdAt).format("DD-MM-YYYY"),
-          classNumber: classDetails.classNumber,
+          status:
+            status as CouponStatus,
+
+          createdAt:
+            dayjs(createdAt).format(
+              "DD-MM-YYYY"
+            ),
+
+          classNumber:
+            classDetails.classNumber,
         };
 
-        if (status === CouponStatus.ACTIVE) {
-          activeCouponsList.push(couponData);
+        if (
+          status ===
+          CouponStatus.ACTIVE
+        ) {
+          activeCouponsList.push(
+            couponData
+          );
         } else {
-          appliedCouponsList.push(couponData);
+          appliedCouponsList.push(
+            couponData
+          );
         }
       }
     });
 
-    activeCouponsList.sort((a, b) => {
-      const dateA = dayjs(a.createdAt, "DD-MM-YYYY");
-      const dateB = dayjs(b.createdAt, "DD-MM-YYYY");
-
-      return dateB.diff(dateA);
-    });
-
-    appliedCouponsList.sort((a, b) => {
-      const dateA = dayjs(a.createdAt, "DD-MM-YYYY");
-      const dateB = dayjs(b.createdAt, "DD-MM-YYYY");
-
-      return dateB.diff(dateA);
-    });
-
     return res.status(200).json({
-      coupons: [...activeCouponsList, ...appliedCouponsList],
+      coupons: [
+        ...activeCouponsList,
+        ...appliedCouponsList,
+      ],
     });
   } catch (err) {
     console.log("err", err);
+
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   EDIT COUPON STATUS
+============================================================ */
 
 const editCouponStatus = async (
   req: RequestWithBody<EditCouponStatusRequest>,
   res: Response
 ) => {
   try {
-    const coupon = await prisma.coupon.findUnique({
-      where: {
-        code: req.body.code,
-      },
-    });
+    const schoolId = getSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message: "schoolId is required",
+      });
+    }
+
+    if (!req.body.code) {
+      return res.status(400).json({
+        message:
+          "Coupon code is required",
+      });
+    }
+
+    /* --------------------------------------------------------
+       FIND COUPON USING COMPOUND UNIQUE KEY
+    -------------------------------------------------------- */
+
+    const coupon =
+      await prisma.coupon.findUnique({
+        where: {
+          schoolId_code: {
+            schoolId,
+            code: req.body.code,
+          },
+        },
+      });
 
     if (!coupon) {
       return res.status(404).json({
@@ -140,22 +265,33 @@ const editCouponStatus = async (
       });
     }
 
+    /* --------------------------------------------------------
+       UPDATE
+    -------------------------------------------------------- */
+
     await prisma.coupon.update({
       where: {
         id: coupon.id,
       },
+
       data: {
-        status: req.body.status,
+        status:
+          req.body.status,
       },
     });
 
     return res.status(200).json({
-      message: "Coupon status updated successfully.",
+      message:
+        "Coupon status updated successfully.",
     });
   } catch (err) {
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   EXPORT
+============================================================ */
 
 export const couponControllers = {
   createCoupon,

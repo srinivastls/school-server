@@ -3,26 +3,111 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.classMiddleWares = void 0;
 const config_1 = require("../config");
 const utils_1 = require("../utils");
-const checkDuplicateClass = (req, res, next) => {
-    config_1.prisma.class
-        .findUnique({ where: { classNumber: req.body.classNumber } })
-        .then((oldClass) => {
+/* ============================================================
+   HELPERS
+============================================================ */
+const getSchoolId = (req) => {
+    return req.user?.schoolId ?? req.body?.schoolId;
+};
+/* ============================================================
+   CHECK DUPLICATE CLASS
+============================================================ */
+const checkDuplicateClass = async (req, res, next) => {
+    try {
+        const schoolId = getSchoolId(req);
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "schoolId is required",
+            });
+        }
+        const { classNumber, academicYearId, } = req.body;
+        if (!classNumber) {
+            return res.status(400).json({
+                message: "classNumber is required",
+            });
+        }
+        /*
+         * New schema:
+         *
+         * @@unique([
+         *   schoolId,
+         *   academicYearId,
+         *   classNumber
+         * ])
+         *
+         * Therefore classNumber alone is NOT unique.
+         */
+        if (!academicYearId) {
+            return res.status(400).json({
+                message: "academicYearId is required",
+            });
+        }
+        const oldClass = await config_1.prisma.class.findUnique({
+            where: {
+                schoolId_academicYearId_classNumber: {
+                    schoolId,
+                    academicYearId,
+                    classNumber,
+                },
+            },
+        });
         if (oldClass) {
-            return res.status(400).json({ message: "Class already exists" });
+            return res.status(400).json({
+                message: "Class already exists",
+            });
         }
         next();
-    })
-        .catch((err) => (0, utils_1.handleErr)(err, res));
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
 };
-const checkClassExists = (req, res, next) => {
-    config_1.prisma.class
-        .findUnique({ where: { classNumber: req.body.classNumber } })
-        .then((oldClass) => {
+/* ============================================================
+   CHECK CLASS EXISTS
+============================================================ */
+const checkClassExists = async (req, res, next) => {
+    try {
+        const schoolId = getSchoolId(req);
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "schoolId is required",
+            });
+        }
+        const { classNumber, academicYearId, } = req.body;
+        if (!classNumber) {
+            return res.status(400).json({
+                message: "classNumber is required",
+            });
+        }
+        if (!academicYearId) {
+            return res.status(400).json({
+                message: "academicYearId is required",
+            });
+        }
+        const oldClass = await config_1.prisma.class.findUnique({
+            where: {
+                schoolId_academicYearId_classNumber: {
+                    schoolId,
+                    academicYearId,
+                    classNumber,
+                },
+            },
+        });
         if (!oldClass) {
-            return res.status(400).json({ message: "Class doesn't exist" });
+            return res.status(400).json({
+                message: "Class doesn't exist",
+            });
         }
         next();
-    })
-        .catch((err) => (0, utils_1.handleErr)(err, res));
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
 };
-exports.classMiddleWares = { checkDuplicateClass, checkClassExists };
+/* ============================================================
+   EXPORT
+============================================================ */
+exports.classMiddleWares = {
+    checkDuplicateClass,
+    checkClassExists,
+};

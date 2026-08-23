@@ -1,7 +1,6 @@
 import { prisma } from "../config";
 
 import {
-  ClassType,
   CreateClassRequest,
   DeleteClassRequest,
   EditClassRequest,
@@ -17,6 +16,31 @@ import {
 
 import { handleErr } from "../utils";
 
+/* ============================================================
+   HELPERS
+============================================================ */
+
+/**
+ * Resolve schoolId.
+ *
+ * For authenticated requests:
+ *   JWT schoolId takes priority.
+ *
+ * For non-authenticated requests such as create/login flows:
+ *   body/query schoolId can be used.
+ */
+const getSchoolId = (req: any): string | undefined => {
+  return (
+    req.user?.schoolId ??
+    req.body?.schoolId ??
+    req.query?.schoolId
+  );
+};
+
+/* ============================================================
+   CREATE CLASS
+============================================================ */
+
 const createClass = async (
   req: RequestWithBody<CreateClassRequest>,
   res: Response
@@ -24,118 +48,257 @@ const createClass = async (
   try {
     const {
       classNumber,
+      displayName,
       tuitionFee,
       textBookFee,
       noteBookFee,
-      year,
-      diary,
-    } = req.body;
+      diaryFee,
+      academicYearId,
+      schoolId,
+    } = req.body as any;
+
+    /*
+     * Prefer authenticated JWT schoolId.
+     * Fall back to body schoolId.
+     */
+    const resolvedSchoolId =
+      getSchoolId(req) ?? schoolId;
 
     if (
       !classNumber ||
-      !tuitionFee ||
-      !textBookFee ||
-      !noteBookFee ||
-      !year ||
-      !diary
+      tuitionFee === undefined ||
+      textBookFee === undefined ||
+      noteBookFee === undefined ||
+      diaryFee === undefined ||
+      !academicYearId ||
+      !resolvedSchoolId
     ) {
-      return res
-        .status(400)
-        .json({ message: "Some fields are missing in request body" });
+      return res.status(400).json({
+        message:
+          "classNumber, tuitionFee, textBookFee, noteBookFee, diaryFee, academicYearId and schoolId are required",
+      });
     }
+
+    /* --------------------------------------------------------
+       Verify academic year belongs to school
+    -------------------------------------------------------- */
+
+    const academicYear =
+      await prisma.academicYear.findFirst({
+        where: {
+          id: academicYearId,
+          schoolId: resolvedSchoolId,
+        },
+      });
+
+    if (!academicYear) {
+      return res.status(400).json({
+        message:
+          "Academic year not found for this school",
+      });
+    }
+
+    /* --------------------------------------------------------
+       Prevent duplicate class
+    -------------------------------------------------------- */
+
+    const existingClass =
+      await prisma.class.findFirst({
+        where: {
+          schoolId: resolvedSchoolId,
+          academicYearId,
+          classNumber,
+        },
+      });
+
+    if (existingClass) {
+      return res.status(409).json({
+        message:
+          "Class already exists for this academic year",
+      });
+    }
+
+    /* --------------------------------------------------------
+       Create class
+    -------------------------------------------------------- */
 
     await prisma.class.create({
       data: {
+        schoolId: resolvedSchoolId,
+        academicYearId,
         classNumber,
+        displayName:
+          displayName ?? classNumber,
         tuitionFee,
         textBookFee,
         noteBookFee,
-        year,
-        diary,
+        diaryFee,
       },
     });
 
-    return res.json({
-      message: "Class created successfully",
+    return res.status(201).json({
+      message:
+        "Class created successfully",
     });
   } catch (err) {
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   GET ALL CLASSES
+============================================================ */
 
 const getAllClasses = async (
   req: Request,
   res: Response<GetAllClassesResponse>
 ) => {
   try {
-    const classes = await prisma.class.findMany();
+    const schoolId =
+      getSchoolId(req);
 
-    const classList: ClassType[] = [];
+    if (!schoolId) {
+      return res.status(400).json({
+        message:
+          "schoolId is required",
+      });
+    }
 
-    classes.forEach((classDetails) => {
-      const {
-        classNumber,
-        tuitionFee,
-        textBookFee,
-        noteBookFee,
-        year,
-        diary,
-      } = classDetails;
+    const classes =
+      await prisma.class.findMany({
+        where: {
+          schoolId,
+          isCompleted: false,
+        },
 
-      if (!classNumber.includes("COMPLETED")) {
-        classList.push({
-          classNumber,
-          tuitionFee,
-          textBookFee,
-          noteBookFee,
-          year,
-          diary,
-        });
-      }
-    });
+        include: {
+          academicYear: true,
+        },
 
-    classList.sort((a, b) => {
-      return +a.classNumber - +b.classNumber;
-    });
+        orderBy: {
+          classNumber: "asc",
+        },
+      });
+
+    const classList =
+      classes.map((classDetails) => ({
+        id: classDetails.id,
+
+        classNumber:
+          classDetails.classNumber,
+
+        displayName:
+          classDetails.displayName,
+
+        tuitionFee:
+          classDetails.tuitionFee,
+
+        textBookFee:
+          classDetails.textBookFee,
+
+        noteBookFee:
+          classDetails.noteBookFee,
+
+        diaryFee:
+          classDetails.diaryFee,
+
+        academicYearId:
+          classDetails.academicYearId,
+
+        academicYear:
+          classDetails.academicYear.name,
+
+        isCompleted:
+          classDetails.isCompleted,
+      }));
 
     return res.status(200).json({
-      classes: classList,
+      classes: classList as any,
     });
   } catch (err) {
     return handleErr(err, res);
   }
 };
 
+/* ============================================================
+   DELETE CLASS
+============================================================ */
+
 const deleteClass = async (
   req: RequestWithBody<DeleteClassRequest>,
   res: Response
 ) => {
   try {
-    if (!req.body.classNumber) {
+    const {
+      classNumber,
+      academicYearId,
+      schoolId,
+    } = req.body as any;
+
+    const resolvedSchoolId =
+      getSchoolId(req) ?? schoolId;
+
+    if (
+      !resolvedSchoolId ||
+      !classNumber
+    ) {
       return res.status(400).json({
-        message: "classNumber missing in request body",
+        message:
+          "schoolId and classNumber are required",
       });
     }
 
-    const classDetails = await prisma.class.findFirst({
-      where: {
-        classNumber: req.body.classNumber,
-      },
-      include: {
-        students: true,
-      },
-    });
+    const classDetails =
+      await prisma.class.findFirst({
+        where: {
+          schoolId:
+            resolvedSchoolId,
+
+          classNumber,
+
+          ...(academicYearId
+            ? { academicYearId }
+            : {}),
+        },
+
+        include: {
+          students: true,
+          sections: true,
+          subjects: true,
+        },
+      });
 
     if (!classDetails) {
-      return res.status(400).json({
-        message: "Class doesn't exist",
+      return res.status(404).json({
+        message:
+          "Class doesn't exist",
       });
     }
 
-    // Prevent deletion if students belong to this class
-    if (classDetails.students.length > 0) {
+    /* --------------------------------------------------------
+       Prevent deletion when students exist
+    -------------------------------------------------------- */
+
+    if (
+      classDetails.students.length > 0
+    ) {
       return res.status(400).json({
-        message: "Cannot delete class because it has students",
+        message:
+          "Cannot delete class because it has students",
+      });
+    }
+
+    /* --------------------------------------------------------
+       Prevent deletion when sections/subjects exist
+    -------------------------------------------------------- */
+
+    if (
+      classDetails.sections.length > 0 ||
+      classDetails.subjects.length > 0
+    ) {
+      return res.status(400).json({
+        message:
+          "Cannot delete class because it has sections or subjects",
       });
     }
 
@@ -146,136 +309,299 @@ const deleteClass = async (
     });
 
     return res.status(200).json({
-      message: "Class deleted successfully",
+      message:
+        "Class deleted successfully",
     });
   } catch (err) {
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   GET CLASS DETAILS
+============================================================ */
 
 const getClassDetails = async (
   req: RequestWithQuery<GetClassRequest>,
   res: Response<GetClassResponse>
 ) => {
   try {
-    if (!req.query.classNumber) {
+    const {
+      classNumber,
+      academicYearId,
+      schoolId,
+    } = req.query as any;
+
+    const resolvedSchoolId =
+      getSchoolId(req) ?? schoolId;
+
+    if (
+      !resolvedSchoolId ||
+      !classNumber
+    ) {
       return res.status(400).json({
-        message: "classNumber missing in request query parameter",
+        message:
+          "schoolId and classNumber are required",
       });
     }
 
-    const classDetails = await prisma.class.findFirst({
-      where: {
-        classNumber: req.query.classNumber,
-      },
-    });
+    const classDetails =
+      await prisma.class.findFirst({
+        where: {
+          schoolId:
+            resolvedSchoolId,
+
+          classNumber,
+
+          ...(academicYearId
+            ? { academicYearId }
+            : {}),
+        },
+
+        include: {
+          academicYear: true,
+        },
+      });
 
     if (!classDetails) {
       return res.status(404).json({
-        message: "Class not found",
+        message:
+          "Class not found",
       });
     }
 
-    const {
-      classNumber,
-      tuitionFee,
-      textBookFee,
-      noteBookFee,
-      year,
-      diary,
-    } = classDetails;
-
     return res.status(200).json({
-      classNumber,
-      tuitionFee,
-      textBookFee,
-      noteBookFee,
-      year,
-      diary,
-    });
+      id: classDetails.id,
+
+      classNumber:
+        classDetails.classNumber,
+
+      displayName:
+        classDetails.displayName,
+
+      tuitionFee:
+        classDetails.tuitionFee,
+
+      textBookFee:
+        classDetails.textBookFee,
+
+      noteBookFee:
+        classDetails.noteBookFee,
+
+      diaryFee:
+        classDetails.diaryFee,
+
+      academicYearId:
+        classDetails.academicYearId,
+
+      academicYear:
+        classDetails.academicYear.name,
+
+      isCompleted:
+        classDetails.isCompleted,
+    } as any);
   } catch (err) {
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   EDIT CLASS
+============================================================ */
 
 const editClassDetails = async (
   req: RequestWithBody<EditClassRequest>,
   res: Response
 ) => {
   try {
-    const existingClass = await prisma.class.findFirst({
-      where: {
-        classNumber: req.body.classNumber,
-      },
-    });
+    const {
+      classNumber,
+      displayName,
+      tuitionFee,
+      textBookFee,
+      noteBookFee,
+      diaryFee,
+      academicYearId,
+      schoolId,
+    } = req.body as any;
+
+    const resolvedSchoolId =
+      getSchoolId(req) ?? schoolId;
+
+    if (
+      !resolvedSchoolId ||
+      !classNumber
+    ) {
+      return res.status(400).json({
+        message:
+          "schoolId and classNumber are required",
+      });
+    }
+
+    /* --------------------------------------------------------
+       Find class in current school
+    -------------------------------------------------------- */
+
+    const existingClass =
+      await prisma.class.findFirst({
+        where: {
+          schoolId:
+            resolvedSchoolId,
+
+          classNumber,
+
+          ...(academicYearId
+            ? { academicYearId }
+            : {}),
+        },
+      });
 
     if (!existingClass) {
       return res.status(404).json({
-        message: "Class not found",
+        message:
+          "Class not found",
       });
     }
+
+    /* --------------------------------------------------------
+       If academic year is changing,
+       make sure it belongs to same school
+    -------------------------------------------------------- */
+
+    if (academicYearId) {
+      const academicYear =
+        await prisma.academicYear.findFirst({
+          where: {
+            id: academicYearId,
+            schoolId:
+              resolvedSchoolId,
+          },
+        });
+
+      if (!academicYear) {
+        return res.status(400).json({
+          message:
+            "Academic year not found for this school",
+        });
+      }
+    }
+
+    /* --------------------------------------------------------
+       Update only supplied fields
+    -------------------------------------------------------- */
 
     await prisma.class.update({
       where: {
         id: existingClass.id,
       },
+
       data: {
-        ...req.body,
+        ...(displayName !== undefined && {
+          displayName,
+        }),
+
+        ...(tuitionFee !== undefined && {
+          tuitionFee,
+        }),
+
+        ...(textBookFee !== undefined && {
+          textBookFee,
+        }),
+
+        ...(noteBookFee !== undefined && {
+          noteBookFee,
+        }),
+
+        ...(diaryFee !== undefined && {
+          diaryFee,
+        }),
+
+        ...(academicYearId !== undefined && {
+          academicYearId,
+        }),
       },
     });
 
     return res.status(200).json({
-      message: "Class details updated successfully.",
+      message:
+        "Class details updated successfully.",
     });
   } catch (err) {
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   MARK CLASS AS COMPLETED
+============================================================ */
 
 const markClassAsCompleted = async (
   req: RequestWithBody<MarkClassCompleteRequest>,
   res: Response
 ) => {
-  const { classNumber } = req.body;
+  const {
+    classNumber,
+    academicYearId,
+    schoolId,
+  } = req.body as any;
 
-  if (!classNumber) {
+  const resolvedSchoolId =
+    getSchoolId(req) ?? schoolId;
+
+  if (
+    !resolvedSchoolId ||
+    !classNumber
+  ) {
     return res.status(400).json({
-      message: "Request body is missing some params",
+      message:
+        "schoolId and classNumber are required",
     });
   }
 
   try {
-    const classDetails = await prisma.class.findFirst({
-      where: {
-        classNumber,
-      },
-    });
+    const classDetails =
+      await prisma.class.findFirst({
+        where: {
+          schoolId:
+            resolvedSchoolId,
+
+          classNumber,
+
+          ...(academicYearId
+            ? { academicYearId }
+            : {}),
+        },
+      });
 
     if (!classDetails) {
-      return res.status(400).json({
-        message: "Source class doesn't exist",
+      return res.status(404).json({
+        message:
+          "Source class doesn't exist",
       });
     }
-
-    const newClassName =
-      `${classNumber}-${classDetails.year}-COMPLETED`;
 
     await prisma.class.update({
       where: {
         id: classDetails.id,
       },
+
       data: {
-        classNumber: newClassName,
+        isCompleted: true,
       },
     });
 
     return res.status(200).json({
-      message: "Class emptied successfully",
+      message:
+        "Class marked as completed successfully",
     });
   } catch (err) {
     return handleErr(err, res);
   }
 };
+
+/* ============================================================
+   EXPORT
+============================================================ */
 
 export const classControllers = {
   createClass,

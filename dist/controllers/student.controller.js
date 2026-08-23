@@ -7,16 +7,23 @@ const utils_1 = require("../utils");
 /* ============================================================
    HELPERS
 ============================================================ */
+const getSchoolId = (req) => {
+    return (req.user?.schoolId ??
+        req.body?.schoolId ??
+        req.query?.schoolId);
+};
 const calculatePendingAmountSync = ({ student, classDetails, coupon, alreadyPaid = 0, }) => {
-    const { tuitionFee, textBookFee, noteBookFee, diary } = classDetails;
-    const { tie, belt, arrears } = student;
+    const { tuitionFee, textBookFee, noteBookFee, diaryFee, } = classDetails;
+    const tieAmount = Number(student?.tie?.amount ?? 0);
+    const beltAmount = Number(student?.belt?.amount ?? 0);
+    const arrearsAmount = Number(student?.arrears?.amount ?? 0);
     return `${Number(tuitionFee) +
         Number(textBookFee) +
         Number(noteBookFee) +
-        Number(diary) +
-        Number(tie.amount) +
-        Number(belt.amount) +
-        Number(arrears.amount) -
+        Number(diaryFee) +
+        tieAmount +
+        beltAmount +
+        arrearsAmount -
         Number(coupon?.discount ?? 0) -
         alreadyPaid}`;
 };
@@ -32,7 +39,7 @@ const getPendingAmountAsync = async (student, classDetails, coupon) => {
     const transactions = await config_1.prisma.transaction.findMany({
         where: {
             studentId: student.id,
-            classNumber: classDetails.classNumber,
+            schoolId: classDetails.schoolId,
         },
     });
     let alreadyPaid = 0;
@@ -70,27 +77,33 @@ const parseSiblings = (siblings) => {
    CREATE STUDENT
 ============================================================ */
 const createStudent = async (req, res) => {
-    const { admissionNo, name, aadhaar, fatherName, dob, doj, phoneNo, classNumber, tie, belt, arrears, couponCode, siblings, adminId, } = req.body;
+    const { admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, tie, belt, arrears, couponCode, siblingStudentsFromDb, } = req.body;
+    const schoolId = getSchoolId(req);
     if (!admissionNo ||
         !name ||
         !aadhaar ||
         !fatherName ||
         !dob ||
         !doj ||
-        !phoneNo ||
+        !phone ||
         !classNumber ||
+        !academicYearId ||
         !tie ||
         !belt ||
         !arrears ||
-        !siblings ||
-        !adminId) {
+        !schoolId) {
         return res.status(400).json({
-            message: "Some fields are missing in request body",
+            message: "schoolId, admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, tie, belt and arrears are required",
         });
     }
     try {
-        const classDetails = await config_1.prisma.class.findUnique({
+        /* --------------------------------------------------------
+           FIND CLASS
+        -------------------------------------------------------- */
+        const classDetails = await config_1.prisma.class.findFirst({
             where: {
+                schoolId,
+                academicYearId,
                 classNumber,
             },
         });
@@ -99,11 +112,33 @@ const createStudent = async (req, res) => {
                 message: "Class doesn't exist.",
             });
         }
+        /* --------------------------------------------------------
+           CHECK ADMISSION NUMBER
+        -------------------------------------------------------- */
+        const existingStudent = await config_1.prisma.student.findUnique({
+            where: {
+                schoolId_admissionNo: {
+                    schoolId,
+                    admissionNo,
+                },
+            },
+        });
+        if (existingStudent) {
+            return res.status(409).json({
+                message: "Student with this admission number already exists",
+            });
+        }
+        /* --------------------------------------------------------
+           COUPON
+        -------------------------------------------------------- */
         let coupon = null;
         if (couponCode) {
             coupon = await config_1.prisma.coupon.findUnique({
                 where: {
-                    code: couponCode,
+                    schoolId_code: {
+                        schoolId,
+                        code: couponCode,
+                    },
                 },
             });
             if (!coupon) {
@@ -122,40 +157,29 @@ const createStudent = async (req, res) => {
                 });
             }
         }
-        const siblingsFromDb = req.body.siblingStudentsFromDb ?? [];
+        /* --------------------------------------------------------
+           SIBLINGS
+        -------------------------------------------------------- */
+        const siblingsFromDb = siblingStudentsFromDb ??
+            req.body.siblingStudentsFromDb ??
+            [];
         const formattedSiblingArray = createSiblingsArray(siblingsFromDb);
-        const studentData = {
-            admissionNo,
-            name,
-            aadhaar,
-            fatherName,
-            dob,
-            doj,
-            phoneNo,
-            classId: classDetails.id,
-            tieAmount: tie.amount,
-            tiePendingAmount: tie.pendingAmount,
-            beltAmount: belt.amount,
-            beltPendingAmount: belt.pendingAmount,
-            arrearsAmount: arrears.amount,
-            arrearsPendingAmount: arrears.pendingAmount,
-            pendingTuitionFee: classDetails.tuitionFee,
-            pendingTextbookFee: classDetails.textBookFee,
-            pendingNotebookFee: classDetails.noteBookFee,
-            pendingDiaryAmount: classDetails.diary,
-            adminId,
-            siblings: formattedSiblingArray,
-            couponId: coupon ? coupon.id : null,
+        /* --------------------------------------------------------
+           PENDING AMOUNTS
+        -------------------------------------------------------- */
+        const studentForCalculation = {
+            tie,
+            belt,
+            arrears,
         };
         const pendingAmount = calculatePendingAmountSync({
-            student: {
-                tie,
-                belt,
-                arrears,
-            },
+            student: studentForCalculation,
             classDetails,
             coupon,
         });
+        /* --------------------------------------------------------
+           CREATE STUDENT
+        -------------------------------------------------------- */
         const student = await config_1.prisma.$transaction(async (tx) => {
             if (coupon) {
                 await tx.coupon.update({
@@ -169,13 +193,35 @@ const createStudent = async (req, res) => {
             }
             return tx.student.create({
                 data: {
-                    ...studentData,
+                    schoolId,
+                    admissionNo,
+                    name,
+                    aadhaar,
+                    fatherName,
+                    dob,
+                    doj,
+                    phone,
+                    classId: classDetails.id,
+                    tieAmount: tie.amount,
+                    tiePendingAmount: tie.pendingAmount,
+                    beltAmount: belt.amount,
+                    beltPendingAmount: belt.pendingAmount,
+                    arrearsAmount: arrears.amount,
+                    arrearsPendingAmount: arrears.pendingAmount,
+                    pendingTuitionFee: classDetails.tuitionFee,
+                    pendingTextbookFee: classDetails.textBookFee,
+                    pendingNotebookFee: classDetails.noteBookFee,
+                    pendingDiaryAmount: classDetails.diaryFee,
+                    siblings: formattedSiblingArray,
+                    couponId: coupon?.id ?? null,
                     pendingAmount,
+                    createdByAdminId: req.user?.id ?? null,
                 },
             });
         });
-        return res.status(200).json({
+        return res.status(201).json({
             message: "Student created successfully",
+            id: student.id,
         });
     }
     catch (err) {
@@ -187,9 +233,20 @@ const createStudent = async (req, res) => {
 ============================================================ */
 const getStudentsByClass = async (req, res) => {
     try {
-        const classDetails = await config_1.prisma.class.findUnique({
+        const schoolId = getSchoolId(req);
+        const { classNumber, academicYearId, } = req.body;
+        if (!schoolId || !classNumber) {
+            return res.status(400).json({
+                message: "schoolId and classNumber are required",
+            });
+        }
+        const classDetails = await config_1.prisma.class.findFirst({
             where: {
-                classNumber: req.body.classNumber,
+                schoolId,
+                classNumber,
+                ...(academicYearId
+                    ? { academicYearId }
+                    : {}),
             },
         });
         if (!classDetails) {
@@ -199,6 +256,7 @@ const getStudentsByClass = async (req, res) => {
         }
         const students = await config_1.prisma.student.findMany({
             where: {
+                schoolId,
                 classId: classDetails.id,
             },
             select: {
@@ -222,9 +280,18 @@ const getStudentsByClass = async (req, res) => {
 ============================================================ */
 const getStudentByCoupon = async (req, res) => {
     try {
+        const schoolId = getSchoolId(req);
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "schoolId is required",
+            });
+        }
         const coupon = await config_1.prisma.coupon.findUnique({
             where: {
-                code: req.body.code,
+                schoolId_code: {
+                    schoolId,
+                    code: req.body.code,
+                },
             },
         });
         if (!coupon) {
@@ -234,6 +301,7 @@ const getStudentByCoupon = async (req, res) => {
         }
         const student = await config_1.prisma.student.findFirst({
             where: {
+                schoolId,
                 couponId: coupon.id,
             },
             include: {
@@ -253,7 +321,7 @@ const getStudentByCoupon = async (req, res) => {
             fatherName: student.fatherName,
             dob: student.dob,
             doj: student.doj,
-            phoneNo: student.phoneNo,
+            phone: student.phone,
             classNumber: student.class.classNumber,
             tie: {
                 amount: student.tieAmount,
@@ -269,13 +337,12 @@ const getStudentByCoupon = async (req, res) => {
             },
             pendingAmount: student.pendingAmount,
             couponCode: student.coupon?.code,
-            tcNo: student.tcNo ?? undefined,
             siblings: parseSiblings(student.siblings),
             pendingTuitionFee: student.pendingTuitionFee,
             pendingNotebookFee: student.pendingNotebookFee,
             pendingTextbookFee: student.pendingTextbookFee,
             pendingDiaryAmount: student.pendingDiaryAmount,
-            adminId: student.adminId,
+            schoolId: student.schoolId,
         });
     }
     catch (err) {
@@ -292,9 +359,18 @@ const getStudent = async (req, res) => {
         });
     }
     try {
+        const schoolId = getSchoolId(req);
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "schoolId is required",
+            });
+        }
         const student = await config_1.prisma.student.findUnique({
             where: {
-                admissionNo: req.body.admissionNo,
+                schoolId_admissionNo: {
+                    schoolId,
+                    admissionNo: req.body.admissionNo,
+                },
             },
             include: {
                 class: true,
@@ -313,7 +389,7 @@ const getStudent = async (req, res) => {
             fatherName: student.fatherName,
             dob: student.dob,
             doj: student.doj,
-            phoneNo: student.phoneNo,
+            phone: student.phone,
             classNumber: student.class.classNumber,
             tie: {
                 amount: student.tieAmount,
@@ -329,13 +405,12 @@ const getStudent = async (req, res) => {
             },
             pendingAmount: student.pendingAmount,
             couponCode: student.coupon?.code,
-            tcNo: student.tcNo ?? undefined,
             siblings: parseSiblings(student.siblings),
             pendingTuitionFee: student.pendingTuitionFee,
             pendingNotebookFee: student.pendingNotebookFee,
             pendingTextbookFee: student.pendingTextbookFee,
             pendingDiaryAmount: student.pendingDiaryAmount,
-            adminId: student.adminId,
+            schoolId: student.schoolId,
         });
     }
     catch (err) {
@@ -346,19 +421,21 @@ const getStudent = async (req, res) => {
    EDIT STUDENT
 ============================================================ */
 const editStudent = async (req, res) => {
-    const { admissionNo, name, aadhaar, fatherName, dob, doj, phoneNo, classNumber, tie, belt, arrears, couponCode, oldAdmissionNo, siblings, } = req.body;
-    if (!admissionNo ||
+    const { admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, tie, belt, arrears, couponCode, oldAdmissionNo, } = req.body;
+    const schoolId = getSchoolId(req);
+    if (!schoolId ||
+        !admissionNo ||
         !name ||
         !aadhaar ||
         !fatherName ||
         !dob ||
         !doj ||
-        !phoneNo ||
+        !phone ||
         !classNumber ||
+        !academicYearId ||
         !tie ||
         !belt ||
         !arrears ||
-        !siblings ||
         !oldAdmissionNo) {
         return res.status(400).json({
             message: "Some fields are missing in request body",
@@ -367,7 +444,10 @@ const editStudent = async (req, res) => {
     try {
         const oldStudent = await config_1.prisma.student.findUnique({
             where: {
-                admissionNo,
+                schoolId_admissionNo: {
+                    schoolId,
+                    admissionNo: oldAdmissionNo,
+                },
             },
             include: {
                 class: true,
@@ -384,8 +464,10 @@ const editStudent = async (req, res) => {
                 message: "Cannot change admission number",
             });
         }
-        const classDetails = await config_1.prisma.class.findUnique({
+        const classDetails = await config_1.prisma.class.findFirst({
             where: {
+                schoolId,
+                academicYearId,
                 classNumber,
             },
         });
@@ -400,7 +482,10 @@ const editStudent = async (req, res) => {
             coupon =
                 await config_1.prisma.coupon.findUnique({
                     where: {
-                        code: couponCode,
+                        schoolId_code: {
+                            schoolId,
+                            code: couponCode,
+                        },
                     },
                 });
             if (!coupon) {
@@ -469,11 +554,11 @@ const editStudent = async (req, res) => {
                     newAmount: classDetails.noteBookFee,
                 }),
             pendingDiaryAmount: isNewClass
-                ? classDetails.diary
+                ? classDetails.diaryFee
                 : getUpdatedIndividualPendingAmount({
                     oldPendingAmount: oldStudent.pendingDiaryAmount,
-                    oldAmount: oldStudent.class.diary,
-                    newAmount: classDetails.diary,
+                    oldAmount: oldStudent.class.diaryFee,
+                    newAmount: classDetails.diaryFee,
                 }),
         };
         const studentForCalculation = {
@@ -511,11 +596,10 @@ const editStudent = async (req, res) => {
                     fatherName,
                     dob,
                     doj,
-                    phoneNo,
+                    phone,
                     classId: classDetails.id,
-                    couponId: coupon
-                        ? coupon.id
-                        : oldStudent.couponId,
+                    couponId: coupon?.id ??
+                        oldStudent.couponId,
                     siblings: createSiblingsArray(req.body
                         .siblingStudentsFromDb ??
                         []),
@@ -537,21 +621,31 @@ const editStudent = async (req, res) => {
 ============================================================ */
 const groupStudentsByClassAndCount = async (req, res) => {
     try {
+        const schoolId = getSchoolId(req);
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "schoolId is required",
+            });
+        }
         const groupedStudents = await config_1.prisma.student.groupBy({
             by: ["classId"],
+            where: {
+                schoolId,
+            },
             _count: {
                 id: true,
             },
         });
         const responseData = [];
         for (const group of groupedStudents) {
-            const classDetails = await config_1.prisma.class.findUnique({
+            const classDetails = await config_1.prisma.class.findFirst({
                 where: {
                     id: group.classId,
+                    schoolId,
                 },
             });
             if (classDetails &&
-                !classDetails.classNumber.includes("COMPLETED")) {
+                !classDetails.isCompleted) {
                 responseData.push({
                     classNumber: classDetails.classNumber,
                     count: String(group._count.id),
@@ -572,16 +666,25 @@ const groupStudentsByClassAndCount = async (req, res) => {
    PROMOTE / DEMOTE STUDENTS
 ============================================================ */
 const promoteDemote = async (req, res) => {
-    const { fromClass, toClass, } = req.body;
-    if (!fromClass || !toClass) {
+    const { fromClass, toClass, fromAcademicYearId, toAcademicYearId, } = req.body;
+    const schoolId = getSchoolId(req);
+    if (!schoolId ||
+        !fromClass ||
+        !toClass) {
         return res.status(400).json({
-            message: "Request body is missing some params",
+            message: "schoolId, fromClass and toClass are required",
         });
     }
     try {
-        const fromClassDetails = await config_1.prisma.class.findUnique({
+        const fromClassDetails = await config_1.prisma.class.findFirst({
             where: {
+                schoolId,
                 classNumber: fromClass,
+                ...(fromAcademicYearId
+                    ? {
+                        academicYearId: fromAcademicYearId,
+                    }
+                    : {}),
             },
         });
         if (!fromClassDetails) {
@@ -589,9 +692,15 @@ const promoteDemote = async (req, res) => {
                 message: "Source class doesn't exist",
             });
         }
-        const toClassDetails = await config_1.prisma.class.findUnique({
+        const toClassDetails = await config_1.prisma.class.findFirst({
             where: {
+                schoolId,
                 classNumber: toClass,
+                ...(toAcademicYearId
+                    ? {
+                        academicYearId: toAcademicYearId,
+                    }
+                    : {}),
             },
         });
         if (!toClassDetails) {
@@ -601,6 +710,7 @@ const promoteDemote = async (req, res) => {
         }
         const studentInTargetClass = await config_1.prisma.student.findFirst({
             where: {
+                schoolId,
                 classId: toClassDetails.id,
             },
         });
@@ -611,6 +721,7 @@ const promoteDemote = async (req, res) => {
         }
         const students = await config_1.prisma.student.findMany({
             where: {
+                schoolId,
                 classId: fromClassDetails.id,
             },
             include: {
@@ -643,7 +754,7 @@ const promoteDemote = async (req, res) => {
                     pendingTuitionFee: toClassDetails.tuitionFee,
                     pendingTextbookFee: toClassDetails.textBookFee,
                     pendingNotebookFee: toClassDetails.noteBookFee,
-                    pendingDiaryAmount: toClassDetails.diary,
+                    pendingDiaryAmount: toClassDetails.diaryFee,
                     arrearsAmount: student.pendingAmount,
                     arrearsPendingAmount: student.pendingAmount,
                     pendingAmount: newPendingAmount,

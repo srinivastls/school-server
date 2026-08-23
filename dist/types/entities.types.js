@@ -1,19 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PaymentMode = exports.CouponStatus = exports.Roles = void 0;
-var Roles;
-(function (Roles) {
-    Roles["owner"] = "owner";
-    Roles["admin"] = "admin";
-    Roles["superadmin"] = "superadmin";
-})(Roles || (exports.Roles = Roles = {}));
+exports.PaymentMode = exports.CouponStatus = void 0;
+const client_1 = require("@prisma/client");
+Object.defineProperty(exports, "PaymentMode", { enumerable: true, get: function () { return client_1.PaymentMode; } });
+/* ============================================================
+   COUPON
+============================================================ */
 var CouponStatus;
 (function (CouponStatus) {
     CouponStatus["ACTIVE"] = "ACTIVE";
     CouponStatus["APPLIED"] = "APPLIED";
 })(CouponStatus || (exports.CouponStatus = CouponStatus = {}));
-var PaymentMode;
-(function (PaymentMode) {
-    PaymentMode["cash"] = "cash";
-    PaymentMode["wallet"] = "wallet";
-})(PaymentMode || (exports.PaymentMode = PaymentMode = {}));

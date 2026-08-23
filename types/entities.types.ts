@@ -1,96 +1,233 @@
-export enum Roles {
-  owner = "owner",
-  admin = "admin",
-  superadmin = "superadmin",
-}
+import {
+  PaymentMode,
+  RoleName,
+} from "@prisma/client";
+
+/* ============================================================
+   ROLE
+============================================================ */
 
 export type RoleType = {
-  name: Roles;
+  name: RoleName;
 };
 
+/* ============================================================
+   USER
+============================================================ */
+
 export type UserType = {
+  id?: string;
+
   email: string;
   name: string;
-  designation: string;
-  adminId: string;
-  roles: { name: Roles }[];
+
+  designation: string | null;
+
+  phone?: string | null;
+
+  department?: string | null;
+
+  employeeId?: string | null;
+
+  schoolId?: string;
+
+  role: RoleName;
+
   password?: string;
 };
 
+/* ============================================================
+   CLASS
+============================================================ */
+
 export type ClassType = {
+  id?: string;
+
   classNumber: string;
+
+  displayName?: string;
+
   tuitionFee: string;
+
   textBookFee: string;
+
   noteBookFee: string;
-  diary: string;
-  year: string;
+
+  diaryFee: string;
+
+  academicYearId?: string;
+
+  academicYear?: string;
+
+  isCompleted?: boolean;
+
+  schoolId?: string;
 };
+
+/* ============================================================
+   COUPON
+============================================================ */
 
 export enum CouponStatus {
   ACTIVE = "ACTIVE",
   APPLIED = "APPLIED",
 }
+
 export type CouponType = {
+  id?: string;
+
   createdAt: string;
+
   classNumber: string;
+
   code: string;
+
   discount: string;
+
   status: CouponStatus;
 };
+
+/* ============================================================
+   SIBLING
+============================================================ */
 
 export type Sibling = {
   admissionNo: string;
   name: string;
 };
 
+/* ============================================================
+   FEE LINE
+============================================================ */
+
 export type FeeLine = {
   amount: string;
   pendingAmount: string;
 };
 
+/* ============================================================
+   STUDENT
+============================================================ */
+
 export type StudentType = {
+  id?: string;
+
+  schoolId?: string;
+
   admissionNo: string;
+
   name: string;
-  aadhaar: string;
+
+  /*
+   * Prisma Student.aadhaar is nullable.
+   */
+  aadhaar?: string | null;
+
   fatherName: string;
+
+  motherName?: string | null;
+
   dob: string;
+
   doj: string;
-  phoneNo: string;
+
+  phone?: string | null;
+
   classNumber: string;
+
+  sectionId?: string;
+
+  sectionName?: string;
+
   tie: FeeLine;
+
   belt: FeeLine;
+
   arrears: FeeLine;
+
   pendingAmount: string;
+
   pendingTuitionFee: string;
+
   pendingTextbookFee: string;
+
   pendingNotebookFee: string;
+
   pendingDiaryAmount: string;
+
   couponCode?: string;
+
   tcNo?: string;
+
   siblings: Sibling[];
-  adminId: string;
+
+  /*
+   * Legacy compatibility only.
+   *
+   * This is NOT used by Transaction.
+   * Student.createdByAdminId is the Prisma field.
+   */
+  adminId?: string;
 };
 
-export enum PaymentMode {
-  cash = "cash",
-  wallet = "wallet",
-}
+/* ============================================================
+   PAYMENT MODE
+============================================================ */
+
+/*
+ * Use Prisma PaymentMode directly.
+ *
+ * Prisma enum:
+ *
+ * CASH
+ * WALLET
+ * ONLINE
+ */
+export { PaymentMode };
+
+/* ============================================================
+   TRANSACTION
+============================================================ */
 
 export type TransactionType = {
+  id?: string;
+
   date: string;
+
   student: StudentType | string | null;
-  adminId: string;
+
   amount: string;
+
   amountDetails: {
     tie: string;
+
     diary: string;
+
     belt: string;
+
     arrears: string;
-  } & Pick<ClassType, "tuitionFee" | "textBookFee" | "noteBookFee"> & {
-      other?: string;
-    };
+
+    tuitionFee: string;
+
+    textBookFee: string;
+
+    noteBookFee: string;
+
+    other?: string;
+  };
+
   pendingAmount: string;
+
   paymentMode: PaymentMode;
+
   classNumber: string;
+
   transactionId?: string;
+
+  /*
+   * New Prisma schema fields.
+   */
+  receiptNumber: string;
+
+  recordedByUserId: string;
 };

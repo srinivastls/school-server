@@ -1,62 +1,156 @@
 import { NextFunction } from "express";
+
 import { prisma } from "../config";
-import { AuthSignupRequest, RequestWithBody, Response } from "../types";
+
+import {
+  AuthSignupRequest,
+  RequestWithBody,
+  Response,
+} from "../types";
+
+import { RoleName } from "@prisma/client";
+
 import { handleErr } from "../utils";
 
-const VALID_ROLES = ["owner", "admin", "superadmin"] as const;
+/* ============================================================
+   CHECK DUPLICATE EMAIL
+   ------------------------------------------------------------
+   Email is unique PER SCHOOL in the new multi-tenant schema.
+============================================================ */
 
-const checkDuplicateEmail = (
+const checkDuplicateEmail = async (
   req: RequestWithBody<AuthSignupRequest>,
   res: Response,
   next: NextFunction
 ) => {
-  prisma.user
-    .findUnique({ where: { email: req.body.email } })
-    .then((user) => {
-      if (user) {
-        return res.status(400).json({ message: "Email ID is already in use!" });
-      }
-      next();
-    })
-    .catch((err) => handleErr(err, res));
+  try {
+    const {
+      email,
+      schoolId,
+    } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        message: "Email is required",
+      });
+    }
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message: "schoolId is required",
+      });
+    }
+
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          schoolId_email: {
+            schoolId,
+            email,
+          },
+        },
+      });
+
+    if (user) {
+      return res.status(400).json({
+        message:
+          "Email ID is already in use in this school!",
+      });
+    }
+
+    next();
+  } catch (err) {
+    return handleErr(err, res);
+  }
 };
 
-const checkDuplicateAdminId = (
+/* ============================================================
+   CHECK SCHOOL EXISTS
+============================================================ */
+
+const checkSchoolExists = async (
   req: RequestWithBody<AuthSignupRequest>,
   res: Response,
   next: NextFunction
 ) => {
-  prisma.user
-    .findUnique({ where: { adminId: req.body.adminId } })
-    .then((user) => {
-      if (user) {
-        return res.status(400).json({ message: "Admin ID is already in use!" });
-      }
-      next();
-    })
-    .catch((err) => handleErr(err, res));
+  try {
+    const { schoolId } =
+      req.body;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message: "schoolId is required",
+      });
+    }
+
+    const school =
+      await prisma.school.findUnique({
+        where: {
+          id: schoolId,
+        },
+      });
+
+    if (!school) {
+      return res.status(404).json({
+        message: "School not found",
+      });
+    }
+
+    next();
+  } catch (err) {
+    return handleErr(err, res);
+  }
 };
 
-const checkRolesExist = (
+/* ============================================================
+   CHECK ROLE
+   ------------------------------------------------------------
+   New roles:
+     PRINCIPAL
+     ADMIN
+     TEACHER
+     PARENT
+============================================================ */
+
+const checkRole = (
   req: RequestWithBody<AuthSignupRequest>,
   res: Response,
   next: NextFunction
 ) => {
-  if (!req.body.roles) {
+  const role =
+    req.body.role;
+
+  /* ----------------------------------------------------------
+     Role is optional because auth.controller.ts defaults
+     missing role to ADMIN.
+  ---------------------------------------------------------- */
+
+  if (!role) {
     next();
     return;
   }
-  for (const role of req.body.roles) {
-    if (!VALID_ROLES.includes(role)) {
-      res.status(400).json({ message: `ERROR: Role ${role} does not exist` });
-      return;
-    }
+
+  if (
+    !Object.values(RoleName).includes(
+      role
+    )
+  ) {
+    return res.status(400).json({
+      message:
+        `Invalid role: ${role}. ` +
+        `Allowed roles: ${Object.values(RoleName).join(", ")}`,
+    });
   }
+
   next();
 };
 
+/* ============================================================
+   EXPORT
+============================================================ */
+
 export const verifySignup = {
   checkDuplicateEmail,
-  checkRolesExist,
-  checkDuplicateAdminId,
+  checkSchoolExists,
+  checkRole,
 };

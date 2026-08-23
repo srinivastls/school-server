@@ -4,7 +4,6 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 import { prisma } from "../config";
 
 import {
-  ClassType,
   GetMonthOrDateReportRequest,
   GetPercUnpaidStudentRequest,
   GetPercUnpaidStudentResponse,
@@ -12,251 +11,565 @@ import {
   RequestWithBody,
   RequestWithQuery,
   Response,
-  StudentType,
   TxnResponse,
 } from "../types";
 
-import { getMonthDateRange, handleErr } from "../utils";
+import {
+  getMonthDateRange,
+  handleErr,
+} from "../utils";
 
 dayjs.extend(customParseFormat);
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
+const getSchoolId = (
+  req: any
+): string | undefined => {
+  return (
+    req.user?.schoolId ??
+    req.body?.schoolId ??
+    req.query?.schoolId
+  );
+};
 
 const getMonthOrDateFilter = (
   date: string,
   month: string,
   year: string
-) => {
+): string[] => {
   if (date) {
     return [date];
   }
 
-  return getMonthDateRange(month ?? "1", year);
-};
-
-const getTotalFee = (
-  student: StudentType,
-  classDetails: ClassType
-) => {
-  const {
-    tuitionFee,
-    textBookFee,
-    noteBookFee,
-    diary,
-  } = classDetails;
-
-  const { tie, belt, arrears } = student;
-
-  return (
-    +tuitionFee +
-    +textBookFee +
-    +noteBookFee +
-    +diary +
-    +tie.amount +
-    +belt.amount +
-    +arrears.amount
+  return getMonthDateRange(
+    month ?? "1",
+    year
   );
 };
+
+/* ============================================================
+   GET STUDENTS WITH PERCENTAGE UNPAID
+============================================================ */
 
 const getPercUnpaidStudents = async (
   req: RequestWithQuery<GetPercUnpaidStudentRequest>,
   res: Response<GetPercUnpaidStudentResponse>
 ) => {
   try {
-    const { classNumber, perc } = req.query;
+    const {
+      classNumber,
+      perc,
+    } = req.query;
+
+    /* --------------------------------------------------------
+       VALIDATE REQUEST
+    -------------------------------------------------------- */
 
     if (!classNumber || !perc) {
       return res.status(400).json({
-        message: "Request query missing some parameters",
+        message:
+          "Request query missing some parameters",
       });
     }
 
-    if (isNaN(+perc)) {
+    const percentage =
+      Number(perc);
+
+    if (
+      !Number.isFinite(percentage) ||
+      percentage < 0 ||
+      percentage > 100
+    ) {
       return res.status(400).json({
-        message: "Invalid percentage",
+        message:
+          "Invalid percentage",
       });
     }
 
-    const classDetails = await prisma.class.findUnique({
-      where: {
-        classNumber,
-      },
-      include: {
-        students: true,
-      },
-    });
+    /* --------------------------------------------------------
+       SCHOOL
+    -------------------------------------------------------- */
+
+    const schoolId =
+      getSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message:
+          "schoolId is required",
+      });
+    }
+
+    /* --------------------------------------------------------
+       FIND CLASS
+       
+       classNumber is not globally unique.
+       Therefore schoolId is always included.
+    -------------------------------------------------------- */
+
+    const classDetails =
+      await prisma.class.findFirst({
+        where: {
+          schoolId,
+          classNumber,
+          isCompleted: false,
+        },
+
+        include: {
+          students: true,
+        },
+      });
 
     if (!classDetails) {
-      return res.status(400).json({
-        message: "Class doesn't exist.",
+      return res.status(404).json({
+        message:
+          "Class doesn't exist.",
       });
     }
 
-    const result: GetPercUnpaidStudentResponse = [];
+    /* --------------------------------------------------------
+       FIND STUDENTS
+    -------------------------------------------------------- */
 
-    for (const student of classDetails.students) {
+    const result: GetPercUnpaidStudentResponse =
+      [];
+
+    for (
+      const student of classDetails.students
+    ) {
       const totalFee =
-        +classDetails.tuitionFee +
-        +classDetails.textBookFee +
-        +classDetails.noteBookFee +
-        +classDetails.diary +
-        +student.tieAmount +
-        +student.beltAmount +
-        +student.arrearsAmount;
+        Number(
+          classDetails.tuitionFee
+        ) +
 
-      if (+student.pendingAmount * (100 / totalFee) >= +perc) {
+        Number(
+          classDetails.textBookFee
+        ) +
+
+        Number(
+          classDetails.noteBookFee
+        ) +
+
+        Number(
+          classDetails.diaryFee
+        ) +
+
+        Number(
+          student.tieAmount
+        ) +
+
+        Number(
+          student.beltAmount
+        ) +
+
+        Number(
+          student.arrearsAmount
+        );
+
+      /* ------------------------------------------------------
+         Avoid division by zero
+      ------------------------------------------------------ */
+
+      if (totalFee <= 0) {
+        continue;
+      }
+
+      const unpaidPercentage =
+        Number(
+          student.pendingAmount
+        ) *
+        (100 / totalFee);
+
+      if (
+        unpaidPercentage >=
+        percentage
+      ) {
         result.push({
-          name: student.name,
-          admissionNo: student.admissionNo,
+          name:
+            student.name,
+
+          admissionNo:
+            student.admissionNo,
         });
       }
     }
 
-    return res.status(200).json(result);
+    return res.status(200).json(
+      result
+    );
   } catch (error) {
-    return handleErr(error, res);
+    return handleErr(
+      error,
+      res
+    );
   }
 };
+
+/* ============================================================
+   GET MONTH / DATE TRANSACTION REPORT
+============================================================ */
 
 const getMonthOrDateReport = async (
   req: RequestWithBody<GetMonthOrDateReportRequest>,
   res: Response<TxnResponse[]>
 ) => {
   try {
-    const { classNumber, month, date, year } = req.body;
+    const {
+      classNumber,
+      month,
+      date,
+      year,
+    } = req.body;
 
-    if (!classNumber || !year || (!month && !date)) {
+    /* --------------------------------------------------------
+       VALIDATE REQUEST
+    -------------------------------------------------------- */
+
+    if (
+      !classNumber ||
+      !year ||
+      (!month && !date)
+    ) {
       return res.status(400).json({
-        message: "Request body is missing some params",
+        message:
+          "Request body is missing some params",
       });
     }
 
-    const dates = getMonthOrDateFilter(
-      date ?? "",
-      month ?? "",
-      year
-    );
+    /* --------------------------------------------------------
+       SCHOOL
+    -------------------------------------------------------- */
 
-    const txns = await prisma.transaction.findMany({
-      where: {
-        classNumber,
-        date: {
-          in: dates,
-        },
-      },
-      include: {
-        student: {
-          include: {
-            class: true,
-            coupon: true,
+    const schoolId =
+      getSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message:
+          "schoolId is required",
+      });
+    }
+
+    /* --------------------------------------------------------
+       DATE FILTER
+    -------------------------------------------------------- */
+
+    const dates =
+      getMonthOrDateFilter(
+        date ?? "",
+        month ?? "",
+        year
+      );
+
+    /* --------------------------------------------------------
+       FIND TRANSACTIONS
+       
+       Filter by schoolId + classNumber + date.
+
+       Do not use findUnique because classNumber
+       is not globally unique.
+    -------------------------------------------------------- */
+
+    const txns =
+      await prisma.transaction.findMany({
+        where: {
+          schoolId,
+
+          classNumber,
+
+          date: {
+            in: dates,
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
 
-    const response: TxnResponse[] = txns.map((txn) => ({
-      date: txn.date,
-      classNumber: txn.classNumber,
-      id: txn.id,
-      pendingAmount: txn.pendingAmount,
-      paymentMode: txn.paymentMode as any,
-      amount: txn.amount,
-      amountDetails: {
-        tie: txn.tieAmount,
-        diary: txn.diaryAmount,
-        belt: txn.beltAmount,
-        arrears: txn.arrearsAmount,
-        tuitionFee: txn.tuitionFeeAmount,
-        textBookFee: txn.textBookFeeAmount,
-        noteBookFee: txn.noteBookFeeAmount,
-      },
-      student: txn.student as any,
-      adminId: txn.adminId,
-    }));
+        include: {
+          student: {
+            include: {
+              class: true,
+              coupon: true,
+            },
+          },
+        },
 
-    return res.status(200).json(response);
+        orderBy: {
+          createdAt:
+            "desc",
+        },
+      });
+
+    /* --------------------------------------------------------
+       MAP RESPONSE
+       
+       Prisma:
+         CASH / WALLET
+       
+       API:
+         cash / wallet
+       
+       Prisma:
+         recordedByUserId
+       
+       API:
+         adminId
+    -------------------------------------------------------- */
+
+    const response: TxnResponse[] =
+      txns.map((txn) => ({
+        id:
+          txn.id,
+
+        date:
+          txn.date,
+
+        classNumber:
+          txn.classNumber,
+
+        pendingAmount:
+          txn.pendingAmount,
+
+        paymentMode: txn.paymentMode as any,
+
+        amount:
+          txn.amount,
+
+        amountDetails: {
+          tie:
+            txn.tieAmount,
+
+          diary:
+            txn.diaryAmount,
+
+          belt:
+            txn.beltAmount,
+
+          arrears:
+            txn.arrearsAmount,
+
+          tuitionFee:
+            txn.tuitionFeeAmount,
+
+          textBookFee:
+            txn.textBookFeeAmount,
+
+          noteBookFee:
+            txn.noteBookFeeAmount,
+        },
+
+        student:
+          txn.student as any,
+
+        adminId:
+          txn.recordedByUserId,
+
+        transactionId:
+          txn.transactionId ??
+          undefined,
+      }));
+
+    return res.status(200).json(
+      response
+    );
   } catch (error) {
-    return handleErr(error, res);
+    return handleErr(
+      error,
+      res
+    );
   }
 };
 
-const getStudentMonthOrDateReport = async (
-  req: RequestWithBody<GetStudentMonthOrDateReportRequest>,
-  res: Response<TxnResponse[]>
-) => {
-  try {
-    const { admissionNo, month, date, year } = req.body;
+/* ============================================================
+   GET STUDENT MONTH / DATE TRANSACTION REPORT
+============================================================ */
 
-    if (!admissionNo || !year || (!month && !date)) {
-      return res.status(400).json({
-        message: "Request body is missing some params",
-      });
-    }
-
-    const student = await prisma.student.findUnique({
-      where: {
+const getStudentMonthOrDateReport =
+  async (
+    req: RequestWithBody<GetStudentMonthOrDateReportRequest>,
+    res: Response<TxnResponse[]>
+  ) => {
+    try {
+      const {
         admissionNo,
-      },
-    });
+        month,
+        date,
+        year,
+      } = req.body;
 
-    if (!student) {
-      return res.status(400).json({
-        message: "Student not found",
-      });
-    }
+      /* ------------------------------------------------------
+         VALIDATE REQUEST
+      ------------------------------------------------------ */
 
-    const dates = getMonthOrDateFilter(
-      date ?? "",
-      month ?? "",
-      year
-    );
+      if (
+        !admissionNo ||
+        !year ||
+        (!month && !date)
+      ) {
+        return res.status(400).json({
+          message:
+            "Request body is missing some params",
+        });
+      }
 
-    const txns = await prisma.transaction.findMany({
-      where: {
-        studentId: student.id,
-        date: {
-          in: dates,
-        },
-      },
-      include: {
-        student: {
-          include: {
-            class: true,
-            coupon: true,
+      /* ------------------------------------------------------
+         SCHOOL
+      ------------------------------------------------------ */
+
+      const schoolId =
+        getSchoolId(req);
+
+      if (!schoolId) {
+        return res.status(400).json({
+          message:
+            "schoolId is required",
+        });
+      }
+
+      /* ------------------------------------------------------
+         FIND STUDENT
+         
+         admissionNo is unique only inside a school.
+      ------------------------------------------------------ */
+
+      const student =
+        await prisma.student.findUnique({
+          where: {
+            schoolId_admissionNo: {
+              schoolId,
+
+              admissionNo,
+            },
           },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        });
 
-    const response: TxnResponse[] = txns.map((txn) => ({
-      date: txn.date,
-      classNumber: txn.classNumber,
-      id: txn.id,
-      pendingAmount: txn.pendingAmount,
-      paymentMode: txn.paymentMode as any,
-      amount: txn.amount,
-      amountDetails: {
-        tie: txn.tieAmount,
-        diary: txn.diaryAmount,
-        belt: txn.beltAmount,
-        arrears: txn.arrearsAmount,
-        tuitionFee: txn.tuitionFeeAmount,
-        textBookFee: txn.textBookFeeAmount,
-        noteBookFee: txn.noteBookFeeAmount,
-      },
-      student: txn.student as any,
-      adminId: txn.adminId,
-    }));
+      if (!student) {
+        return res.status(404).json({
+          message:
+            "Student not found",
+        });
+      }
 
-    return res.status(200).json(response);
-  } catch (error) {
-    return handleErr(error, res);
-  }
-};
+      /* ------------------------------------------------------
+         DATE FILTER
+      ------------------------------------------------------ */
+
+      const dates =
+        getMonthOrDateFilter(
+          date ?? "",
+          month ?? "",
+          year
+        );
+
+      /* ------------------------------------------------------
+         FIND TRANSACTIONS
+         
+         IMPORTANT:
+         Filter by studentId rather than classNumber.
+
+         This preserves historical transactions
+         after promotion/demotion.
+      ------------------------------------------------------ */
+
+      const txns =
+        await prisma.transaction.findMany({
+          where: {
+            schoolId,
+
+            studentId:
+              student.id,
+
+            date: {
+              in: dates,
+            },
+          },
+
+          include: {
+            student: {
+              include: {
+                class: true,
+                coupon: true,
+              },
+            },
+          },
+
+          orderBy: {
+            createdAt:
+              "desc",
+          },
+        });
+
+      /* ------------------------------------------------------
+         MAP RESPONSE
+      ------------------------------------------------------ */
+
+      const response: TxnResponse[] =
+        txns.map((txn) => ({
+          id:
+            txn.id,
+
+          date:
+            txn.date,
+
+          classNumber:
+            txn.classNumber,
+
+          pendingAmount:
+            txn.pendingAmount,
+
+          paymentMode: txn.paymentMode as any,
+
+          amount:
+            txn.amount,
+
+          amountDetails: {
+            tie:
+              txn.tieAmount,
+
+            diary:
+              txn.diaryAmount,
+
+            belt:
+              txn.beltAmount,
+
+            arrears:
+              txn.arrearsAmount,
+
+            tuitionFee:
+              txn.tuitionFeeAmount,
+
+            textBookFee:
+              txn.textBookFeeAmount,
+
+            noteBookFee:
+              txn.noteBookFeeAmount,
+          },
+
+          student:
+            txn.student as any,
+
+          adminId:
+            txn.recordedByUserId,
+
+          transactionId:
+            txn.transactionId ??
+            undefined,
+        }));
+
+      return res.status(200).json(
+        response
+      );
+    } catch (error) {
+      return handleErr(
+        error,
+        res
+      );
+    }
+  };
+
+/* ============================================================
+   EXPORT
+============================================================ */
 
 export const reportControllers = {
   getPercUnpaidStudents,

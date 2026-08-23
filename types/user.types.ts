@@ -1,4 +1,14 @@
-import { Roles, UserType } from "./entities.types";
+import { RoleName } from "@prisma/client";
 
-export type UserItem = Omit<UserType, "roles"> & { roles: Roles[] };
-export type GetAllUsersResponse = { users: UserItem[] };
+export type UserItem = {
+  id: string;
+  name: string;
+  email: string;
+  designation: string | null;
+  role: RoleName;
+  schoolId: string;
+};
+
+export type GetAllUsersResponse = {
+  users: UserItem[];
+};

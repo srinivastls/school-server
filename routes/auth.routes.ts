@@ -1,40 +1,74 @@
 import { Express } from "express";
+
 import { authController } from "../controllers";
 import { authJwt, verifySignup } from "../middlewares";
 
 export const useAuthRoutes = (app: Express) => {
+  /* ============================================================
+     CREATE PLATFORM ADMIN
+     ------------------------------------------------------------
+     Platform admin is NOT a normal school User.
+     It is stored in PlatformAdmin.
+  ============================================================ */
+
   app.post(
     "/api/auth/createSuperAdmin",
-    [verifySignup.checkDuplicateEmail, verifySignup.checkDuplicateAdminId],
     authController.createSuperAdmin
   );
 
-  //signup
+  /* ============================================================
+     SIGN UP SCHOOL USER
+     ------------------------------------------------------------
+     Expected:
+       name
+       email
+       password
+       schoolId
+       designation?
+       role?
+
+     If signup should only be performed by an authenticated
+     principal/admin, add authJwt.verifyToken + isPrincipal
+     here.
+  ============================================================ */
+
   app.post(
     "/api/auth/signup",
     [
-      authJwt.verifyToken,
+      verifySignup.checkSchoolExists,
       verifySignup.checkDuplicateEmail,
-      verifySignup.checkDuplicateAdminId,
-      verifySignup.checkRolesExist,
+      verifySignup.checkRole,
     ],
     authController.signup
   );
 
-  //signin
-  app.post("/api/auth/signin", authController.signin);
+  /* ============================================================
+     SIGN IN
+     ------------------------------------------------------------
+     Expected:
+       email
+       password
+       schoolId
+  ============================================================ */
 
-  //delete
   app.post(
-    "/api/auth/delete",
-    [authJwt.verifyToken, authJwt.isSuperAdmin],
-    authController.delete
+    "/api/auth/signin",
+    authController.signin
   );
 
-  //delete superadmin
+  /* ============================================================
+     DELETE SCHOOL USER
+     ------------------------------------------------------------
+     Only authenticated Principal should normally be allowed
+     to delete users.
+  ============================================================ */
+
   app.post(
-    "/api/auth/deleteSuperAdmin",
-    [authJwt.verifyToken, authJwt.isSuperAdmin, authJwt.isOwner],
+    "/api/auth/delete",
+    [
+      authJwt.verifyToken,
+      authJwt.isPrincipal,
+    ],
     authController.delete
   );
 };

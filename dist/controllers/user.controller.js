@@ -6,21 +6,31 @@ const utils_1 = require("../utils");
 const getAllUsers = async (req, res) => {
     try {
         const users = await config_1.prisma.user.findMany({
-            include: {
-                roles: true,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                designation: true,
+                role: true,
+                schoolId: true,
             },
         });
         const usersList = users.map((user) => ({
+            id: user.id,
             name: user.name,
-            designation: user.designation,
-            adminId: user.adminId,
             email: user.email,
-            roles: user.roles.map((role) => role.name),
+            designation: user.designation,
+            role: user.role,
+            schoolId: user.schoolId,
         }));
-        return res.status(200).json({ users: usersList });
+        return res.status(200).json({
+            users: usersList,
+        });
     }
     catch (err) {
         return (0, utils_1.handleErr)(err, res);
     }
 };
-exports.userController = { getAllUsers };
+exports.userController = {
+    getAllUsers,
+};
