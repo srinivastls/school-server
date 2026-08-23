@@ -14,7 +14,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-__exportStar(require("./verifySignup"), exports);
 __exportStar(require("./authJwt"), exports);
 __exportStar(require("./classMiddlewares"), exports);
 __exportStar(require("./couponMiddlewares"), exports);

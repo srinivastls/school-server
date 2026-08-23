@@ -39,16 +39,20 @@ const verifyToken = (req, res, next) => {
                 });
             }
             /*
-             * Keep backward compatibility.
+             * Backward compatibility.
              */
-            req.userId = payload.id;
+            req.userId =
+                payload.id;
             /*
-             * New multi-tenant request context.
+             * Store complete authentication
+             * context.
              */
             req.user = {
                 id: payload.id,
                 schoolId: payload.schoolId,
+                schoolCode: payload.schoolCode,
                 role: payload.role,
+                type: payload.type,
             };
             next();
         });
@@ -58,18 +62,8 @@ const verifyToken = (req, res, next) => {
     }
 };
 /* ============================================================
-   SUPER ADMIN / PLATFORM ADMIN
+   PLATFORM ADMIN
 ============================================================ */
-/*
- * Platform admins are NOT stored in User.
- *
- * They are stored in:
- *
- *   PlatformAdmin
- *
- * Therefore this middleware must verify against
- * prisma.platformAdmin.
- */
 const isSuperAdmin = async (req, res, next) => {
     try {
         const userId = req.userId;
@@ -78,6 +72,10 @@ const isSuperAdmin = async (req, res, next) => {
                 message: "Unauthorized",
             });
         }
+        /*
+         * Platform admins live in
+         * PlatformAdmin, not User.
+         */
         const platformAdmin = await config_1.prisma.platformAdmin.findUnique({
             where: {
                 id: userId,
@@ -85,16 +83,29 @@ const isSuperAdmin = async (req, res, next) => {
         });
         if (!platformAdmin) {
             return res.status(403).json({
-                message: "Require superadmin access",
+                message: "Require platform admin access",
             });
         }
-        /*
-         * Verify actual PlatformAdmin role.
-         */
+        if (!platformAdmin.isActive) {
+            return res.status(403).json({
+                message: "Platform admin account is inactive",
+            });
+        }
         if (platformAdmin.role !==
             client_1.PlatformAdminRole.PLATFORM_ADMIN) {
             return res.status(403).json({
-                message: "Require superadmin access",
+                message: "Require platform admin access",
+            });
+        }
+        /*
+         * Make sure this is actually
+         * a platform token.
+         */
+        if (req.user?.type &&
+            req.user.type !==
+                "PLATFORM_ADMIN") {
+            return res.status(403).json({
+                message: "Invalid platform authentication",
             });
         }
         next();
@@ -104,30 +115,54 @@ const isSuperAdmin = async (req, res, next) => {
     }
 };
 /* ============================================================
+   LOAD SCHOOL USER
+============================================================ */
+const getAuthenticatedSchoolUser = async (req, res) => {
+    const userId = req.userId;
+    if (!userId) {
+        res.status(401).json({
+            message: "Unauthorized",
+        });
+        return null;
+    }
+    const user = await config_1.prisma.user.findUnique({
+        where: {
+            id: userId,
+        },
+    });
+    if (!user) {
+        res.status(401).json({
+            message: "Unauthorized",
+        });
+        return null;
+    }
+    if (!user.isActive) {
+        res.status(403).json({
+            message: "User account is inactive",
+        });
+        return null;
+    }
+    /*
+     * The school from the database is
+     * the authoritative tenant.
+     */
+    req.user = {
+        id: user.id,
+        schoolId: user.schoolId,
+        schoolCode: req.user?.schoolCode,
+        role: user.role,
+        type: "SCHOOL_USER",
+    };
+    return user;
+};
+/* ============================================================
    PRINCIPAL
 ============================================================ */
 const isPrincipal = async (req, res, next) => {
     try {
-        const userId = req.userId;
-        if (!userId) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-        const user = await config_1.prisma.user.findUnique({
-            where: {
-                id: userId,
-            },
-        });
+        const user = await getAuthenticatedSchoolUser(req, res);
         if (!user) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-        if (!user.isActive) {
-            return res.status(403).json({
-                message: "User account is inactive",
-            });
+            return;
         }
         if (user.role !==
             client_1.RoleName.PRINCIPAL) {
@@ -135,15 +170,6 @@ const isPrincipal = async (req, res, next) => {
                 message: "Require principal role",
             });
         }
-        /*
-         * Make sure request context matches
-         * the actual database user.
-         */
-        req.user = {
-            id: user.id,
-            schoolId: user.schoolId,
-            role: user.role,
-        };
         next();
     }
     catch (err) {
@@ -154,64 +180,34 @@ const isPrincipal = async (req, res, next) => {
    OWNER
 ============================================================ */
 /*
- * New schema has:
+ * Old application used OWNER.
  *
- * PRINCIPAL
- * ADMIN
- * TEACHER
- * PARENT
+ * New schema uses PRINCIPAL.
  *
- * There is no OWNER role.
- *
- * Existing routes still reference isOwner,
- * therefore keep this alias for compatibility.
- *
- * OWNER -> PRINCIPAL
+ * Keep alias so existing routes
+ * don't immediately break.
  */
 const isOwner = isPrincipal;
 /* ============================================================
    ADMIN
 ============================================================ */
-/*
- * ADMIN-level operations are allowed for:
- *
- *   PRINCIPAL
- *   ADMIN
- */
 const isAdmin = async (req, res, next) => {
     try {
-        const userId = req.userId;
-        if (!userId) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-        const user = await config_1.prisma.user.findUnique({
-            where: {
-                id: userId,
-            },
-        });
+        const user = await getAuthenticatedSchoolUser(req, res);
         if (!user) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
+            return;
         }
-        if (!user.isActive) {
-            return res.status(403).json({
-                message: "User account is inactive",
-            });
-        }
-        if (user.role !== client_1.RoleName.ADMIN &&
-            user.role !== client_1.RoleName.PRINCIPAL) {
+        /*
+         * Principal has all admin permissions.
+         */
+        if (user.role !==
+            client_1.RoleName.ADMIN &&
+            user.role !==
+                client_1.RoleName.PRINCIPAL) {
             return res.status(403).json({
                 message: "Require admin role",
             });
         }
-        req.user = {
-            id: user.id,
-            schoolId: user.schoolId,
-            role: user.role,
-        };
         next();
     }
     catch (err) {
@@ -223,37 +219,16 @@ const isAdmin = async (req, res, next) => {
 ============================================================ */
 const isTeacher = async (req, res, next) => {
     try {
-        const userId = req.userId;
-        if (!userId) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-        const user = await config_1.prisma.user.findUnique({
-            where: {
-                id: userId,
-            },
-        });
+        const user = await getAuthenticatedSchoolUser(req, res);
         if (!user) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
+            return;
         }
-        if (!user.isActive) {
-            return res.status(403).json({
-                message: "User account is inactive",
-            });
-        }
-        if (user.role !== client_1.RoleName.TEACHER) {
+        if (user.role !==
+            client_1.RoleName.TEACHER) {
             return res.status(403).json({
                 message: "Require teacher role",
             });
         }
-        req.user = {
-            id: user.id,
-            schoolId: user.schoolId,
-            role: user.role,
-        };
         next();
     }
     catch (err) {
@@ -265,37 +240,16 @@ const isTeacher = async (req, res, next) => {
 ============================================================ */
 const isParent = async (req, res, next) => {
     try {
-        const userId = req.userId;
-        if (!userId) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-        const user = await config_1.prisma.user.findUnique({
-            where: {
-                id: userId,
-            },
-        });
+        const user = await getAuthenticatedSchoolUser(req, res);
         if (!user) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
+            return;
         }
-        if (!user.isActive) {
-            return res.status(403).json({
-                message: "User account is inactive",
-            });
-        }
-        if (user.role !== client_1.RoleName.PARENT) {
+        if (user.role !==
+            client_1.RoleName.PARENT) {
             return res.status(403).json({
                 message: "Require parent role",
             });
         }
-        req.user = {
-            id: user.id,
-            schoolId: user.schoolId,
-            role: user.role,
-        };
         next();
     }
     catch (err) {
@@ -305,42 +259,22 @@ const isParent = async (req, res, next) => {
 /* ============================================================
    SCHOOL USER
 ============================================================ */
-/*
- * Allows any authenticated school user.
- *
- * PRINCIPAL
- * ADMIN
- * TEACHER
- * PARENT
- */
 const isSchoolUser = async (req, res, next) => {
     try {
-        const userId = req.userId;
-        if (!userId) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-        const user = await config_1.prisma.user.findUnique({
-            where: {
-                id: userId,
-            },
-        });
+        const user = await getAuthenticatedSchoolUser(req, res);
         if (!user) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
+            return;
         }
-        if (!user.isActive) {
+        /*
+         * Ensure this is not a platform
+         * administrator token.
+         */
+        if (req.user?.type ===
+            "PLATFORM_ADMIN") {
             return res.status(403).json({
-                message: "User account is inactive",
+                message: "School user authentication required",
             });
         }
-        req.user = {
-            id: user.id,
-            schoolId: user.schoolId,
-            role: user.role,
-        };
         next();
     }
     catch (err) {
@@ -348,24 +282,18 @@ const isSchoolUser = async (req, res, next) => {
     }
 };
 /* ============================================================
-   EXPORTS
+   EXPORT
 ============================================================ */
 exports.authJwt = {
     verifyToken,
-    /*
-     * Platform level
-     */
+    /* Platform */
     isSuperAdmin,
-    /*
-     * School level
-     */
+    /* School */
+    isSchoolUser,
     isPrincipal,
     isAdmin,
     isTeacher,
     isParent,
-    isSchoolUser,
-    /*
-     * Backward compatibility.
-     */
+    /* Compatibility */
     isOwner,
 };

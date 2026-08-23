@@ -1,46 +1,27 @@
-import { RoleName } from "@prisma/client";
+import {
+  RoleName,
+  PlatformAdminRole,
+} from "@prisma/client";
 
 /* ============================================================
-   SIGN UP
-============================================================ */
-
-export type AuthSignupRequest = {
-  name: string;
-  email: string;
-  password: string;
-
-  role?: RoleName;
-
-  designation?: string;
-  phone?: string;
-  department?: string;
-  employeeId?: string;
-
-  schoolId?: string;
-};
-
-/* ============================================================
-   SIGN IN
+   SCHOOL USER SIGN IN
 ============================================================ */
 
 export type AuthSigninRequest = {
+  schoolCode: string;
   email: string;
   password: string;
-
-  schoolId?: string;
 };
-
-/* ============================================================
-   SIGN IN RESPONSE
-============================================================ */
 
 export type AuthSigninResponse = {
   id: string;
 
   accessToken: string;
+
   accessTokenTTL: number;
 
   name: string;
+
   email: string;
 
   role: RoleName;
@@ -48,32 +29,138 @@ export type AuthSigninResponse = {
   designation: string | null;
 
   schoolId: string;
+
+  schoolCode: string;
+
+  schoolName: string;
 };
 
 /* ============================================================
-   CREATE PLATFORM ADMIN
+   PLATFORM ADMIN SIGN IN
 ============================================================ */
 
-export type CreateSuperAdminRequest = {
-  name: string;
+export type PlatformAdminSigninRequest = {
   email: string;
+
+  password: string;
+};
+
+export type PlatformAdminSigninResponse = {
+  id: string;
+
+  accessToken: string;
+
+  accessTokenTTL: number;
+
+  name: string;
+
+  email: string;
+
+  role: PlatformAdminRole;
+
+  type: "PLATFORM_ADMIN";
+};
+
+/* ============================================================
+   CREATE PRINCIPAL
+   ------------------------------------------------------------
+   Only PLATFORM_ADMIN can create a principal.
+============================================================ */
+
+export type CreatePrincipalRequest = {
+  schoolId: string;
+
+  name: string;
+
+  email: string;
+
   password: string;
 
   designation?: string;
 
-  /*
-   * Kept optional for backward compatibility.
-   * Platform admins normally do not belong to a school.
-   */
-  schoolId?: string;
+  phone?: string;
+
+  department?: string;
+
+  employeeId?: string;
+};
+
+/* ============================================================
+   CREATE SCHOOL ADMIN
+   ------------------------------------------------------------
+   Only PRINCIPAL can create an ADMIN.
+   
+   schoolId is intentionally NOT accepted.
+   It comes from req.user.schoolId.
+============================================================ */
+
+export type CreateAdminRequest = {
+  name: string;
+
+  email: string;
+
+  password: string;
+
+  designation?: string;
+
+  phone?: string;
+
+  department?: string;
+
+  employeeId?: string;
+};
+
+/* ============================================================
+   CREATE TEACHER
+   ------------------------------------------------------------
+   PRINCIPAL / ADMIN can create a TEACHER.
+   
+   schoolId comes from authenticated user.
+============================================================ */
+
+export type CreateTeacherRequest = {
+  name: string;
+
+  email: string;
+
+  password: string;
+
+  designation?: string;
+
+  phone?: string;
+
+  department?: string;
+
+  employeeId?: string;
+};
+
+/* ============================================================
+   CREATE PARENT
+   ------------------------------------------------------------
+   PRINCIPAL / ADMIN can create a PARENT account.
+   
+   schoolId comes from authenticated user.
+============================================================ */
+
+export type CreateParentRequest = {
+  name: string;
+
+  email: string;
+
+  password: string;
+
+  phone?: string;
 };
 
 /* ============================================================
    DELETE USER
+   ------------------------------------------------------------
+   Principal can delete school users.
+   
+   schoolId is intentionally NOT accepted.
+   It comes from req.user.schoolId.
 ============================================================ */
 
 export type DeleteUserRequest = {
   email: string;
-
-  schoolId?: string;
 };

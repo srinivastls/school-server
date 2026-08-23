@@ -239,6 +239,8 @@ model PlatformAdmin {
 model School {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
+  code String @unique
+
   name         String
   address      String?
   contactEmail String? @map("contact_email")

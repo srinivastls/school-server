@@ -1,5 +1,3 @@
-// types/express.d.ts
-
 import { RoleName } from "@prisma/client";
 
 declare global {
@@ -10,7 +8,11 @@ declare global {
       user?: {
         id: string;
         schoolId?: string;
+        schoolCode?: string;
         role?: RoleName;
+        type?:
+          | "PLATFORM_ADMIN"
+          | "SCHOOL_USER";
       };
     }
   }

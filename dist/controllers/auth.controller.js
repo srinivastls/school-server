@@ -10,136 +10,83 @@ const client_1 = require("@prisma/client");
 const config_1 = require("../config");
 const utils_1 = require("../utils");
 /* ============================================================
+   CONSTANTS
+============================================================ */
+const ACCESS_TOKEN_TTL = 86400;
+/* ============================================================
    HELPERS
 ============================================================ */
-const getSchoolId = (req) => {
-    return req.user?.schoolId ?? req.body?.schoolId;
+const normalizeEmail = (email) => {
+    return email.trim().toLowerCase();
+};
+const normalizeSchoolCode = (schoolCode) => {
+    return schoolCode.trim().toUpperCase();
+};
+const getAuthenticatedSchoolId = (req) => {
+    return req.user?.schoolId;
 };
 /* ============================================================
-   SIGN UP
-============================================================ */
-const signup = async (req, res) => {
-    try {
-        const { name, email, password, designation, schoolId, role, } = req.body;
-        /*
-         * Prefer schoolId from authenticated JWT.
-         * Fall back to request body for signup.
-         */
-        const resolvedSchoolId = getSchoolId(req) ?? schoolId;
-        if (!name ||
-            !email ||
-            !password ||
-            !resolvedSchoolId) {
-            return res.status(400).json({
-                message: "name, email, password and schoolId are required",
-            });
-        }
-        /* --------------------------------------------------------
-           Verify school exists
-        -------------------------------------------------------- */
-        const school = await config_1.prisma.school.findUnique({
-            where: {
-                id: resolvedSchoolId,
-            },
-        });
-        if (!school) {
-            return res.status(404).json({
-                message: "School not found",
-            });
-        }
-        /* --------------------------------------------------------
-           Validate role
-        -------------------------------------------------------- */
-        const userRole = role &&
-            Object.values(client_1.RoleName).includes(role)
-            ? role
-            : client_1.RoleName.ADMIN;
-        /* --------------------------------------------------------
-           Check duplicate email within school
-        -------------------------------------------------------- */
-        const existingUser = await config_1.prisma.user.findUnique({
-            where: {
-                schoolId_email: {
-                    schoolId: resolvedSchoolId,
-                    email,
-                },
-            },
-        });
-        if (existingUser) {
-            return res.status(409).json({
-                message: "User with this email already exists in this school",
-            });
-        }
-        /* --------------------------------------------------------
-           Hash password
-        -------------------------------------------------------- */
-        const passwordHash = await bcrypt_1.default.hash(password, 8);
-        /* --------------------------------------------------------
-           Create user
-        -------------------------------------------------------- */
-        await config_1.prisma.user.create({
-            data: {
-                schoolId: resolvedSchoolId,
-                name,
-                email,
-                designation: designation ?? null,
-                passwordHash,
-                role: userRole,
-            },
-        });
-        /*
-         * Do NOT return id here.
-         *
-         * Your current generic Response type only supports:
-         *
-         * { message: unknown }
-         */
-        return res.status(201).json({
-            message: "User created successfully",
-        });
-    }
-    catch (err) {
-        return (0, utils_1.handleErr)(err, res);
-    }
-};
-/* ============================================================
-   SIGN IN
+   SCHOOL USER SIGN IN
+   ------------------------------------------------------------
+   Login:
+      schoolCode + email + password
 ============================================================ */
 const signin = async (req, res) => {
     try {
-        const { email, password, schoolId, } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({
-                message: "Email and password are required",
-            });
-        }
+        const { schoolCode, email, password, } = req.body;
         /* --------------------------------------------------------
-           Resolve school / tenant
+           VALIDATION
         -------------------------------------------------------- */
-        const resolvedSchoolId = getSchoolId(req) ?? schoolId;
-        if (!resolvedSchoolId) {
+        if (!schoolCode ||
+            !email ||
+            !password) {
             return res.status(400).json({
-                message: "schoolId is required for school user login",
+                message: "schoolCode, email and password are required",
+            });
+        }
+        const normalizedSchoolCode = normalizeSchoolCode(schoolCode);
+        const normalizedEmail = normalizeEmail(email);
+        /* --------------------------------------------------------
+           FIND SCHOOL
+        -------------------------------------------------------- */
+        const school = await config_1.prisma.school.findUnique({
+            where: {
+                code: normalizedSchoolCode,
+            },
+        });
+        if (!school) {
+            return res.status(401).json({
+                message: "Invalid school code or credentials",
             });
         }
         /* --------------------------------------------------------
-           Find user inside school
+           SCHOOL STATUS
+        -------------------------------------------------------- */
+        if (school.status !== "ACTIVE") {
+            return res.status(403).json({
+                message: "School account is not active",
+            });
+        }
+        /* --------------------------------------------------------
+           FIND USER
+           
+           Email is unique within a school.
         -------------------------------------------------------- */
         const user = await config_1.prisma.user.findUnique({
             where: {
                 schoolId_email: {
-                    schoolId: resolvedSchoolId,
-                    email,
+                    schoolId: school.id,
+                    email: normalizedEmail,
                 },
             },
         });
         if (!user) {
-            return res.status(404).json({
-                message: "User not found!",
+            return res.status(401).json({
+                message: "Invalid school code or credentials",
             });
         }
         /* --------------------------------------------------------
-           Check active status
+           USER STATUS
         -------------------------------------------------------- */
         if (!user.isActive) {
             return res.status(403).json({
@@ -147,16 +94,16 @@ const signin = async (req, res) => {
             });
         }
         /* --------------------------------------------------------
-           Verify password
+           PASSWORD
         -------------------------------------------------------- */
-        const isPasswordValid = await bcrypt_1.default.compare(password, user.passwordHash);
-        if (!isPasswordValid) {
+        const passwordValid = await bcrypt_1.default.compare(password, user.passwordHash);
+        if (!passwordValid) {
             return res.status(401).json({
-                message: "Password incorrect",
+                message: "Invalid school code or credentials",
             });
         }
         /* --------------------------------------------------------
-           Update last login
+           LAST LOGIN
         -------------------------------------------------------- */
         await config_1.prisma.user.update({
             where: {
@@ -167,63 +114,448 @@ const signin = async (req, res) => {
             },
         });
         /* --------------------------------------------------------
-           Create JWT
+           JWT
         -------------------------------------------------------- */
-        const token = jsonwebtoken_1.default.sign({
+        const accessToken = jsonwebtoken_1.default.sign({
             id: user.id,
-            schoolId: user.schoolId,
+            schoolId: school.id,
+            schoolCode: school.code,
             role: user.role,
             type: "SCHOOL_USER",
         }, config_1.authConfig.secret, {
-            expiresIn: 86400,
+            expiresIn: ACCESS_TOKEN_TTL,
         });
         /* --------------------------------------------------------
-           Response
+           RESPONSE
         -------------------------------------------------------- */
         return res.status(200).json({
             id: user.id,
-            accessToken: token,
-            accessTokenTTL: 86400,
+            accessToken,
+            accessTokenTTL: ACCESS_TOKEN_TTL,
             name: user.name,
             email: user.email,
             role: user.role,
             designation: user.designation,
-            schoolId: user.schoolId,
+            schoolId: school.id,
+            schoolCode: school.code,
+            schoolName: school.name,
         });
     }
-    catch (err) {
-        return (0, utils_1.handleErr)(err, res);
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
     }
 };
 /* ============================================================
-   DELETE USER
+   PLATFORM ADMIN SIGN IN
 ============================================================ */
-const deleteUser = async (req, res) => {
+const platformAdminSignin = async (req, res) => {
     try {
-        const { email, schoolId, } = req.body;
-        /*
-         * For authenticated requests, JWT schoolId
-         * should take precedence over body schoolId.
-         */
-        const resolvedSchoolId = getSchoolId(req) ?? schoolId;
-        if (!email) {
+        const { email, password, } = req.body;
+        /* --------------------------------------------------------
+           VALIDATION
+        -------------------------------------------------------- */
+        if (!email || !password) {
             return res.status(400).json({
-                message: "Email field missing in request body",
+                message: "Email and password are required",
             });
         }
-        if (!resolvedSchoolId) {
-            return res.status(400).json({
-                message: "schoolId is required",
+        const normalizedEmail = normalizeEmail(email);
+        /* --------------------------------------------------------
+           FIND PLATFORM ADMIN
+        -------------------------------------------------------- */
+        const platformAdmin = await config_1.prisma.platformAdmin.findUnique({
+            where: {
+                email: normalizedEmail,
+            },
+        });
+        if (!platformAdmin) {
+            return res.status(401).json({
+                message: "Invalid credentials",
             });
         }
         /* --------------------------------------------------------
-           Find user inside current school
+           ACTIVE CHECK
+        -------------------------------------------------------- */
+        if (!platformAdmin.isActive) {
+            return res.status(403).json({
+                message: "Platform admin account is inactive",
+            });
+        }
+        /* --------------------------------------------------------
+           PASSWORD
+        -------------------------------------------------------- */
+        const passwordValid = await bcrypt_1.default.compare(password, platformAdmin.passwordHash);
+        if (!passwordValid) {
+            return res.status(401).json({
+                message: "Invalid credentials",
+            });
+        }
+        /* --------------------------------------------------------
+           LAST LOGIN
+        -------------------------------------------------------- */
+        await config_1.prisma.platformAdmin.update({
+            where: {
+                id: platformAdmin.id,
+            },
+            data: {
+                lastLogin: new Date(),
+            },
+        });
+        /* --------------------------------------------------------
+           JWT
+        -------------------------------------------------------- */
+        const accessToken = jsonwebtoken_1.default.sign({
+            id: platformAdmin.id,
+            role: platformAdmin.role,
+            type: "PLATFORM_ADMIN",
+        }, config_1.authConfig.secret, {
+            expiresIn: ACCESS_TOKEN_TTL,
+        });
+        /* --------------------------------------------------------
+           RESPONSE
+        -------------------------------------------------------- */
+        return res.status(200).json({
+            id: platformAdmin.id,
+            accessToken,
+            accessTokenTTL: ACCESS_TOKEN_TTL,
+            name: platformAdmin.name,
+            email: platformAdmin.email,
+            role: platformAdmin.role,
+            type: "PLATFORM_ADMIN",
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+/* ============================================================
+   CREATE PRINCIPAL
+   ------------------------------------------------------------
+   PLATFORM ADMIN ONLY
+============================================================ */
+const createPrincipal = async (req, res) => {
+    try {
+        const { name, email, password, designation, phone, department, employeeId, } = req.body;
+        const schoolId = req.params.schoolId;
+        /* --------------------------------------------------------
+           VALIDATION
+        -------------------------------------------------------- */
+        if (!schoolId ||
+            !name ||
+            !email ||
+            !password) {
+            return res.status(400).json({
+                message: "schoolId, name, email and password are required",
+            });
+        }
+        const normalizedEmail = normalizeEmail(email);
+        /* --------------------------------------------------------
+           FIND SCHOOL
+        -------------------------------------------------------- */
+        const school = await config_1.prisma.school.findUnique({
+            where: {
+                id: schoolId,
+            },
+        });
+        if (!school) {
+            return res.status(404).json({
+                message: "School not found",
+            });
+        }
+        /* --------------------------------------------------------
+           SCHOOL STATUS
+        -------------------------------------------------------- */
+        if (school.status === "SUSPENDED" ||
+            school.status === "EXPIRED") {
+            return res.status(403).json({
+                message: "School is not available",
+            });
+        }
+        /* --------------------------------------------------------
+           ONE PRINCIPAL PER SCHOOL
+        -------------------------------------------------------- */
+        const existingPrincipal = await config_1.prisma.user.findFirst({
+            where: {
+                schoolId,
+                role: client_1.RoleName.PRINCIPAL,
+            },
+        });
+        if (existingPrincipal) {
+            return res.status(409).json({
+                message: "This school already has a principal",
+            });
+        }
+        /* --------------------------------------------------------
+           CHECK EMAIL
+        -------------------------------------------------------- */
+        const existingUser = await config_1.prisma.user.findUnique({
+            where: {
+                schoolId_email: {
+                    schoolId,
+                    email: normalizedEmail,
+                },
+            },
+        });
+        if (existingUser) {
+            return res.status(409).json({
+                message: "User with this email already exists in this school",
+            });
+        }
+        /* --------------------------------------------------------
+           PASSWORD
+        -------------------------------------------------------- */
+        const passwordHash = await bcrypt_1.default.hash(password, 10);
+        /* --------------------------------------------------------
+           CREATE PRINCIPAL
+        -------------------------------------------------------- */
+        const principal = await config_1.prisma.user.create({
+            data: {
+                schoolId,
+                name,
+                email: normalizedEmail,
+                passwordHash,
+                role: client_1.RoleName.PRINCIPAL,
+                designation: designation ??
+                    "Principal",
+                phone: phone ?? null,
+                department: department ?? null,
+                employeeId: employeeId ?? null,
+            },
+        });
+        return res.status(201).json({
+            message: "Principal created successfully",
+            id: principal.id,
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+/* ============================================================
+   CREATE SCHOOL ADMIN
+   ------------------------------------------------------------
+   PRINCIPAL ONLY
+============================================================ */
+const createAdmin = async (req, res) => {
+    try {
+        const { name, email, password, designation, phone, department, employeeId, } = req.body;
+        const schoolId = getAuthenticatedSchoolId(req);
+        if (!schoolId ||
+            !name ||
+            !email ||
+            !password) {
+            return res.status(400).json({
+                message: "name, email and password are required",
+            });
+        }
+        const normalizedEmail = normalizeEmail(email);
+        /* --------------------------------------------------------
+           SCHOOL
+        -------------------------------------------------------- */
+        const school = await config_1.prisma.school.findUnique({
+            where: {
+                id: schoolId,
+            },
+        });
+        if (!school) {
+            return res.status(404).json({
+                message: "School not found",
+            });
+        }
+        if (school.status !== "ACTIVE") {
+            return res.status(403).json({
+                message: "School account is not active",
+            });
+        }
+        /* --------------------------------------------------------
+           DUPLICATE EMAIL
+        -------------------------------------------------------- */
+        const existingUser = await config_1.prisma.user.findUnique({
+            where: {
+                schoolId_email: {
+                    schoolId,
+                    email: normalizedEmail,
+                },
+            },
+        });
+        if (existingUser) {
+            return res.status(409).json({
+                message: "User with this email already exists in this school",
+            });
+        }
+        /* --------------------------------------------------------
+           CREATE ADMIN
+        -------------------------------------------------------- */
+        const passwordHash = await bcrypt_1.default.hash(password, 10);
+        const admin = await config_1.prisma.user.create({
+            data: {
+                schoolId,
+                name,
+                email: normalizedEmail,
+                passwordHash,
+                role: client_1.RoleName.ADMIN,
+                designation: designation ??
+                    "School Admin",
+                phone: phone ?? null,
+                department: department ?? null,
+                employeeId: employeeId ?? null,
+            },
+        });
+        return res.status(201).json({
+            message: "School admin created successfully",
+            id: admin.id,
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+/* ============================================================
+   CREATE TEACHER
+   ------------------------------------------------------------
+   PRINCIPAL / ADMIN
+============================================================ */
+const createTeacher = async (req, res) => {
+    try {
+        const { name, email, password, designation, phone, department, employeeId, } = req.body;
+        const schoolId = getAuthenticatedSchoolId(req);
+        if (!schoolId ||
+            !name ||
+            !email ||
+            !password) {
+            return res.status(400).json({
+                message: "name, email and password are required",
+            });
+        }
+        const normalizedEmail = normalizeEmail(email);
+        /* --------------------------------------------------------
+           DUPLICATE
+        -------------------------------------------------------- */
+        const existingUser = await config_1.prisma.user.findUnique({
+            where: {
+                schoolId_email: {
+                    schoolId,
+                    email: normalizedEmail,
+                },
+            },
+        });
+        if (existingUser) {
+            return res.status(409).json({
+                message: "User with this email already exists in this school",
+            });
+        }
+        /* --------------------------------------------------------
+           CREATE TEACHER
+        -------------------------------------------------------- */
+        const passwordHash = await bcrypt_1.default.hash(password, 10);
+        const teacher = await config_1.prisma.user.create({
+            data: {
+                schoolId,
+                name,
+                email: normalizedEmail,
+                passwordHash,
+                role: client_1.RoleName.TEACHER,
+                designation: designation ??
+                    "Teacher",
+                phone: phone ?? null,
+                department: department ?? null,
+                employeeId: employeeId ?? null,
+            },
+        });
+        return res.status(201).json({
+            message: "Teacher created successfully",
+            id: teacher.id,
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+/* ============================================================
+   CREATE PARENT
+   ------------------------------------------------------------
+   PRINCIPAL / ADMIN
+============================================================ */
+const createParent = async (req, res) => {
+    try {
+        const { name, email, password, phone, } = req.body;
+        const schoolId = getAuthenticatedSchoolId(req);
+        if (!schoolId ||
+            !name ||
+            !email ||
+            !password) {
+            return res.status(400).json({
+                message: "name, email and password are required",
+            });
+        }
+        const normalizedEmail = normalizeEmail(email);
+        /* --------------------------------------------------------
+           DUPLICATE
+        -------------------------------------------------------- */
+        const existingUser = await config_1.prisma.user.findUnique({
+            where: {
+                schoolId_email: {
+                    schoolId,
+                    email: normalizedEmail,
+                },
+            },
+        });
+        if (existingUser) {
+            return res.status(409).json({
+                message: "User with this email already exists in this school",
+            });
+        }
+        /* --------------------------------------------------------
+           CREATE PARENT
+        -------------------------------------------------------- */
+        const passwordHash = await bcrypt_1.default.hash(password, 10);
+        const parent = await config_1.prisma.user.create({
+            data: {
+                schoolId,
+                name,
+                email: normalizedEmail,
+                passwordHash,
+                role: client_1.RoleName.PARENT,
+                phone: phone ?? null,
+            },
+        });
+        return res.status(201).json({
+            message: "Parent account created successfully",
+            id: parent.id,
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+/* ============================================================
+   DELETE SCHOOL USER
+   ------------------------------------------------------------
+   PRINCIPAL ONLY
+============================================================ */
+const deleteUser = async (req, res) => {
+    try {
+        const { email, } = req.body;
+        const schoolId = getAuthenticatedSchoolId(req);
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "Authenticated school is missing",
+            });
+        }
+        if (!email) {
+            return res.status(400).json({
+                message: "Email is required",
+            });
+        }
+        const normalizedEmail = normalizeEmail(email);
+        /* --------------------------------------------------------
+           FIND USER
         -------------------------------------------------------- */
         const user = await config_1.prisma.user.findUnique({
             where: {
                 schoolId_email: {
-                    schoolId: resolvedSchoolId,
-                    email,
+                    schoolId,
+                    email: normalizedEmail,
                 },
             },
         });
@@ -233,7 +565,18 @@ const deleteUser = async (req, res) => {
             });
         }
         /* --------------------------------------------------------
-           Delete
+           NEVER DELETE PRINCIPAL HERE
+           
+           Principal should be managed by Platform Admin.
+        -------------------------------------------------------- */
+        if (user.role ===
+            client_1.RoleName.PRINCIPAL) {
+            return res.status(403).json({
+                message: "Principal account can only be managed by platform admin",
+            });
+        }
+        /* --------------------------------------------------------
+           DELETE
         -------------------------------------------------------- */
         await config_1.prisma.user.delete({
             where: {
@@ -244,55 +587,8 @@ const deleteUser = async (req, res) => {
             message: "User deleted successfully",
         });
     }
-    catch (err) {
-        return (0, utils_1.handleErr)(err, res);
-    }
-};
-/* ============================================================
-   CREATE PLATFORM ADMIN
-============================================================ */
-const createSuperAdmin = async (req, res) => {
-    try {
-        const { name, email, password, } = req.body;
-        if (!name || !email || !password) {
-            return res.status(400).json({
-                message: "name, email and password are required",
-            });
-        }
-        /* --------------------------------------------------------
-           Platform admin email is globally unique
-        -------------------------------------------------------- */
-        const existingAdmin = await config_1.prisma.platformAdmin.findUnique({
-            where: {
-                email,
-            },
-        });
-        if (existingAdmin) {
-            return res.status(409).json({
-                message: "Platform admin with this email already exists",
-            });
-        }
-        /* --------------------------------------------------------
-           Hash password
-        -------------------------------------------------------- */
-        const passwordHash = await bcrypt_1.default.hash(password, 8);
-        /* --------------------------------------------------------
-           Create platform admin
-        -------------------------------------------------------- */
-        await config_1.prisma.platformAdmin.create({
-            data: {
-                name,
-                email,
-                passwordHash,
-                role: client_1.PlatformAdminRole.PLATFORM_ADMIN,
-            },
-        });
-        return res.status(201).json({
-            message: "Platform admin created successfully",
-        });
-    }
-    catch (err) {
-        return (0, utils_1.handleErr)(err, res);
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
     }
 };
 /* ============================================================
@@ -300,7 +596,10 @@ const createSuperAdmin = async (req, res) => {
 ============================================================ */
 exports.authController = {
     signin,
-    signup,
+    platformAdminSignin,
+    createPrincipal,
+    createAdmin,
+    createTeacher,
+    createParent,
     delete: deleteUser,
-    createSuperAdmin,
 };

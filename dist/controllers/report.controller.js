@@ -57,8 +57,11 @@ const getPercUnpaidStudents = async (req, res) => {
         /* --------------------------------------------------------
            FIND CLASS
            
-           classNumber is not globally unique.
-           Therefore schoolId is always included.
+           classNumber is unique only together with:
+           schoolId + academicYearId + classNumber
+    
+           This API currently does not receive academicYearId,
+           so we use schoolId + classNumber and only active classes.
         -------------------------------------------------------- */
         const classDetails = await config_1.prisma.class.findFirst({
             where: {
@@ -76,7 +79,7 @@ const getPercUnpaidStudents = async (req, res) => {
             });
         }
         /* --------------------------------------------------------
-           FIND STUDENTS
+           CALCULATE RESULT
         -------------------------------------------------------- */
         const result = [];
         for (const student of classDetails.students) {
@@ -95,8 +98,7 @@ const getPercUnpaidStudents = async (req, res) => {
             }
             const unpaidPercentage = Number(student.pendingAmount) *
                 (100 / totalFee);
-            if (unpaidPercentage >=
-                percentage) {
+            if (unpaidPercentage >= percentage) {
                 result.push({
                     name: student.name,
                     admissionNo: student.admissionNo,
@@ -140,11 +142,6 @@ const getMonthOrDateReport = async (req, res) => {
         const dates = getMonthOrDateFilter(date ?? "", month ?? "", year);
         /* --------------------------------------------------------
            FIND TRANSACTIONS
-           
-           Filter by schoolId + classNumber + date.
-    
-           Do not use findUnique because classNumber
-           is not globally unique.
         -------------------------------------------------------- */
         const txns = await config_1.prisma.transaction.findMany({
             where: {
@@ -169,17 +166,12 @@ const getMonthOrDateReport = async (req, res) => {
         /* --------------------------------------------------------
            MAP RESPONSE
            
-           Prisma:
-             CASH / WALLET
-           
-           API:
-             cash / wallet
-           
-           Prisma:
-             recordedByUserId
-           
-           API:
-             adminId
+           New Transaction schema:
+    
+           recordedByUserId
+           receiptNumber
+    
+           Old adminId is no longer returned.
         -------------------------------------------------------- */
         const response = txns.map((txn) => ({
             id: txn.id,
@@ -198,9 +190,10 @@ const getMonthOrDateReport = async (req, res) => {
                 noteBookFee: txn.noteBookFeeAmount,
             },
             student: txn.student,
-            adminId: txn.recordedByUserId,
             transactionId: txn.transactionId ??
                 undefined,
+            receiptNumber: txn.receiptNumber,
+            recordedByUserId: txn.recordedByUserId,
         }));
         return res.status(200).json(response);
     }
@@ -259,7 +252,7 @@ const getStudentMonthOrDateReport = async (req, res) => {
            FIND TRANSACTIONS
            
            IMPORTANT:
-           Filter by studentId rather than classNumber.
+           Use studentId rather than classNumber.
   
            This preserves historical transactions
            after promotion/demotion.
@@ -304,9 +297,10 @@ const getStudentMonthOrDateReport = async (req, res) => {
                 noteBookFee: txn.noteBookFeeAmount,
             },
             student: txn.student,
-            adminId: txn.recordedByUserId,
             transactionId: txn.transactionId ??
                 undefined,
+            receiptNumber: txn.receiptNumber,
+            recordedByUserId: txn.recordedByUserId,
         }));
         return res.status(200).json(response);
     }
