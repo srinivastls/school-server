@@ -75,8 +75,7 @@ const getPercUnpaidStudents = async (
       });
     }
 
-    const percentage =
-      Number(perc);
+    const percentage = Number(perc);
 
     if (
       !Number.isFinite(percentage) ||
@@ -93,8 +92,7 @@ const getPercUnpaidStudents = async (
        SCHOOL
     -------------------------------------------------------- */
 
-    const schoolId =
-      getSchoolId(req);
+    const schoolId = getSchoolId(req);
 
     if (!schoolId) {
       return res.status(400).json({
@@ -106,8 +104,11 @@ const getPercUnpaidStudents = async (
     /* --------------------------------------------------------
        FIND CLASS
        
-       classNumber is not globally unique.
-       Therefore schoolId is always included.
+       classNumber is unique only together with:
+       schoolId + academicYearId + classNumber
+
+       This API currently does not receive academicYearId,
+       so we use schoolId + classNumber and only active classes.
     -------------------------------------------------------- */
 
     const classDetails =
@@ -131,7 +132,7 @@ const getPercUnpaidStudents = async (
     }
 
     /* --------------------------------------------------------
-       FIND STUDENTS
+       CALCULATE RESULT
     -------------------------------------------------------- */
 
     const result: GetPercUnpaidStudentResponse =
@@ -144,27 +145,21 @@ const getPercUnpaidStudents = async (
         Number(
           classDetails.tuitionFee
         ) +
-
         Number(
           classDetails.textBookFee
         ) +
-
         Number(
           classDetails.noteBookFee
         ) +
-
         Number(
           classDetails.diaryFee
         ) +
-
         Number(
           student.tieAmount
         ) +
-
         Number(
           student.beltAmount
         ) +
-
         Number(
           student.arrearsAmount
         );
@@ -178,19 +173,14 @@ const getPercUnpaidStudents = async (
       }
 
       const unpaidPercentage =
-        Number(
-          student.pendingAmount
-        ) *
+        Number(student.pendingAmount) *
         (100 / totalFee);
 
       if (
-        unpaidPercentage >=
-        percentage
+        unpaidPercentage >= percentage
       ) {
         result.push({
-          name:
-            student.name,
-
+          name: student.name,
           admissionNo:
             student.admissionNo,
         });
@@ -266,11 +256,6 @@ const getMonthOrDateReport = async (
 
     /* --------------------------------------------------------
        FIND TRANSACTIONS
-       
-       Filter by schoolId + classNumber + date.
-
-       Do not use findUnique because classNumber
-       is not globally unique.
     -------------------------------------------------------- */
 
     const txns =
@@ -295,34 +280,26 @@ const getMonthOrDateReport = async (
         },
 
         orderBy: {
-          createdAt:
-            "desc",
+          createdAt: "desc",
         },
       });
 
     /* --------------------------------------------------------
        MAP RESPONSE
        
-       Prisma:
-         CASH / WALLET
-       
-       API:
-         cash / wallet
-       
-       Prisma:
-         recordedByUserId
-       
-       API:
-         adminId
+       New Transaction schema:
+
+       recordedByUserId
+       receiptNumber
+
+       Old adminId is no longer returned.
     -------------------------------------------------------- */
 
     const response: TxnResponse[] =
       txns.map((txn) => ({
-        id:
-          txn.id,
+        id: txn.id,
 
-        date:
-          txn.date,
+        date: txn.date,
 
         classNumber:
           txn.classNumber,
@@ -330,7 +307,8 @@ const getMonthOrDateReport = async (
         pendingAmount:
           txn.pendingAmount,
 
-        paymentMode: txn.paymentMode as any,
+        paymentMode:
+          txn.paymentMode,
 
         amount:
           txn.amount,
@@ -361,12 +339,15 @@ const getMonthOrDateReport = async (
         student:
           txn.student as any,
 
-        adminId:
-          txn.recordedByUserId,
-
         transactionId:
           txn.transactionId ??
           undefined,
+
+        receiptNumber:
+          txn.receiptNumber,
+
+        recordedByUserId:
+          txn.recordedByUserId,
       }));
 
     return res.status(200).json(
@@ -437,7 +418,6 @@ const getStudentMonthOrDateReport =
           where: {
             schoolId_admissionNo: {
               schoolId,
-
               admissionNo,
             },
           },
@@ -465,7 +445,7 @@ const getStudentMonthOrDateReport =
          FIND TRANSACTIONS
          
          IMPORTANT:
-         Filter by studentId rather than classNumber.
+         Use studentId rather than classNumber.
 
          This preserves historical transactions
          after promotion/demotion.
@@ -494,8 +474,7 @@ const getStudentMonthOrDateReport =
           },
 
           orderBy: {
-            createdAt:
-              "desc",
+            createdAt: "desc",
           },
         });
 
@@ -505,11 +484,9 @@ const getStudentMonthOrDateReport =
 
       const response: TxnResponse[] =
         txns.map((txn) => ({
-          id:
-            txn.id,
+          id: txn.id,
 
-          date:
-            txn.date,
+          date: txn.date,
 
           classNumber:
             txn.classNumber,
@@ -517,7 +494,8 @@ const getStudentMonthOrDateReport =
           pendingAmount:
             txn.pendingAmount,
 
-          paymentMode: txn.paymentMode as any,
+          paymentMode:
+            txn.paymentMode,
 
           amount:
             txn.amount,
@@ -548,12 +526,15 @@ const getStudentMonthOrDateReport =
           student:
             txn.student as any,
 
-          adminId:
-            txn.recordedByUserId,
-
           transactionId:
             txn.transactionId ??
             undefined,
+
+          receiptNumber:
+            txn.receiptNumber,
+
+          recordedByUserId:
+            txn.recordedByUserId,
         }));
 
       return res.status(200).json(
