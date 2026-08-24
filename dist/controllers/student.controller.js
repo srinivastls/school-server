@@ -432,14 +432,10 @@ const getStudentByCoupon = async (req, res) => {
     }
 };
 /* ============================================================
-   GET STUDENT
+   STUDENT REGISTRATION OPTIONS
+   Academic Year -> Class -> Section
 ============================================================ */
-const getStudent = async (req, res) => {
-    if (!req.body.admissionNo) {
-        return res.status(400).json({
-            message: "Admission number missing in request body",
-        });
-    }
+const getStudentRegistrationOptions = async (req, res) => {
     try {
         const schoolId = getSchoolId(req);
         if (!schoolId) {
@@ -447,16 +443,91 @@ const getStudent = async (req, res) => {
                 message: "schoolId is required",
             });
         }
+        const academicYears = await config_1.prisma.academicYear.findMany({
+            where: {
+                schoolId,
+            },
+            orderBy: {
+                startDate: "desc",
+            },
+            select: {
+                id: true,
+                name: true,
+                startDate: true,
+                endDate: true,
+                isCurrent: true,
+                classes: {
+                    orderBy: {
+                        classNumber: "asc",
+                    },
+                    select: {
+                        id: true,
+                        classNumber: true,
+                        displayName: true,
+                        tuitionFee: true,
+                        textBookFee: true,
+                        noteBookFee: true,
+                        diaryFee: true,
+                        sections: {
+                            orderBy: {
+                                sectionName: "asc",
+                            },
+                            select: {
+                                id: true,
+                                sectionName: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        return res.status(200).json({
+            academicYears,
+        });
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
+};
+/* ============================================================
+   GET STUDENT
+============================================================ */
+const getStudent = async (req, res) => {
+    const { admissionNo, } = req.body;
+    const schoolId = getSchoolId(req);
+    if (!schoolId || !admissionNo) {
+        return res.status(400).json({
+            message: "Admission number is required",
+        });
+    }
+    try {
         const student = await config_1.prisma.student.findUnique({
             where: {
                 schoolId_admissionNo: {
                     schoolId,
-                    admissionNo: req.body.admissionNo,
+                    admissionNo,
                 },
             },
             include: {
-                class: true,
+                class: {
+                    include: {
+                        academicYear: true,
+                    },
+                },
+                section: true,
                 coupon: true,
+                parentLinks: {
+                    include: {
+                        parentUser: {
+                            select: {
+                                id: true,
+                                name: true,
+                                phone: true,
+                                email: true,
+                            },
+                        },
+                    },
+                },
             },
         });
         if (!student) {
@@ -464,15 +535,59 @@ const getStudent = async (req, res) => {
                 message: "Student not found",
             });
         }
+        /*
+         * ---------------------------------------------------------
+         * RETURN EDIT-FRIENDLY RESPONSE
+         * ---------------------------------------------------------
+         */
         return res.status(200).json({
+            id: student.id,
             admissionNo: student.admissionNo,
             name: student.name,
             aadhaar: student.aadhaar,
             fatherName: student.fatherName,
+            motherName: student.motherName,
             dob: student.dob,
             doj: student.doj,
-            phone: student.phone,
-            classNumber: student.class.classNumber,
+            phoneNo: student.phone,
+            tcNo: "",
+            /*
+             * -------------------------------------------------------
+             * ACADEMIC YEAR
+             * -------------------------------------------------------
+             */
+            academicYearId: student.class.academicYear.id,
+            academicYear: {
+                id: student.class.academicYear.id,
+                name: student.class.academicYear.name,
+                startDate: student.class.academicYear.startDate,
+                endDate: student.class.academicYear.endDate,
+                isCurrent: student.class.academicYear.isCurrent,
+            },
+            /*
+             * -------------------------------------------------------
+             * CLASS
+             * -------------------------------------------------------
+             */
+            classNumber: {
+                id: student.class.id,
+                classNumber: student.class.classNumber,
+                displayName: student.class.displayName,
+            },
+            /*
+             * -------------------------------------------------------
+             * SECTION
+             * -------------------------------------------------------
+             */
+            section: {
+                id: student.section.id,
+                sectionName: student.section.sectionName,
+            },
+            /*
+             * -------------------------------------------------------
+             * FEES
+             * -------------------------------------------------------
+             */
             tie: {
                 amount: student.tieAmount,
                 pendingAmount: student.tiePendingAmount,
@@ -485,27 +600,76 @@ const getStudent = async (req, res) => {
                 amount: student.arrearsAmount,
                 pendingAmount: student.arrearsPendingAmount,
             },
-            pendingAmount: student.pendingAmount,
-            couponCode: student.coupon?.code,
-            siblings: parseSiblings(student.siblings),
+            diary: {
+                amount: student.pendingDiaryAmount,
+            },
             pendingTuitionFee: student.pendingTuitionFee,
-            pendingNotebookFee: student.pendingNotebookFee,
             pendingTextbookFee: student.pendingTextbookFee,
+            pendingNotebookFee: student.pendingNotebookFee,
             pendingDiaryAmount: student.pendingDiaryAmount,
-            schoolId: student.schoolId,
+            pendingAmount: student.pendingAmount,
+            /*
+             * -------------------------------------------------------
+             * SIBLINGS
+             * -------------------------------------------------------
+             */
+            siblings: student.siblings,
+            /*
+             * -------------------------------------------------------
+             * COUPON
+             * -------------------------------------------------------
+             */
+            couponCode: student.coupon
+                ? {
+                    id: student.coupon.id,
+                    code: student.coupon.code,
+                    discount: student.coupon.discount,
+                    status: student.coupon.status,
+                }
+                : null,
+            /*
+             * -------------------------------------------------------
+             * STATUS
+             * -------------------------------------------------------
+             */
+            status: student.status,
+            rollNumber: student.rollNumber,
+            gender: student.gender,
+            bloodGroup: student.bloodGroup,
+            category: student.category,
+            religion: student.religion,
+            emergencyContact: student.emergencyContact,
+            photoUrl: student.photoUrl,
+            previousSchool: student.previousSchool,
+            /*
+             * -------------------------------------------------------
+             * PARENTS
+             * -------------------------------------------------------
+             */
+            parentLinks: student.parentLinks,
+            createdAt: student.createdAt,
+            updatedAt: student.updatedAt,
         });
     }
     catch (err) {
-        return (0, utils_1.handleErr)(err, res);
+        console.error("GET STUDENT ERROR:", err);
+        return res.status(500).json({
+            message: err?.message ??
+                "Unknown error",
+        });
     }
 };
 /* ============================================================
    EDIT STUDENT
 ============================================================ */
 const editStudent = async (req, res) => {
-    const { admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, tie, belt, arrears, couponCode, oldAdmissionNo, } = req.body;
+    const { oldAdmissionNo, admissionNo, name, aadhaar, fatherName, motherName, dob, doj, phone, academicYearId, classNumber, sectionName, tie, belt, arrears, couponCode, siblingStudentsFromDb, siblings, } = req.body;
     const schoolId = getSchoolId(req);
+    /* ============================================================
+       VALIDATION
+    ============================================================ */
     if (!schoolId ||
+        !oldAdmissionNo ||
         !admissionNo ||
         !name ||
         !aadhaar ||
@@ -513,54 +677,80 @@ const editStudent = async (req, res) => {
         !dob ||
         !doj ||
         !phone ||
-        !classNumber ||
         !academicYearId ||
+        !classNumber ||
+        !sectionName ||
         !tie ||
         !belt ||
-        !arrears ||
-        !oldAdmissionNo) {
+        !arrears) {
         return res.status(400).json({
             message: "Some fields are missing in request body",
         });
     }
     try {
-        const oldStudent = await config_1.prisma.student.findUnique({
+        /* ============================================================
+           FIND EXISTING STUDENT
+        ============================================================ */
+        const student = await config_1.prisma.student.findUnique({
             where: {
                 schoolId_admissionNo: {
                     schoolId,
                     admissionNo: oldAdmissionNo,
                 },
             },
-            include: {
-                class: true,
-                coupon: true,
-            },
         });
-        if (!oldStudent) {
+        if (!student) {
             return res.status(404).json({
                 message: "Student not found",
             });
         }
-        if (oldAdmissionNo !== admissionNo) {
+        /* ============================================================
+           ADMISSION NUMBER CANNOT CHANGE
+        ============================================================ */
+        if (admissionNo !== oldAdmissionNo) {
             return res.status(400).json({
                 message: "Cannot change admission number",
             });
         }
-        const classDetails = await config_1.prisma.class.findFirst({
+        /* ============================================================
+           FIND CLASS FOR ACADEMIC YEAR
+        ============================================================ */
+        const classDetails = await config_1.prisma.class.findUnique({
             where: {
-                schoolId,
-                academicYearId,
-                classNumber,
+                schoolId_academicYearId_classNumber: {
+                    schoolId,
+                    academicYearId,
+                    classNumber,
+                },
             },
         });
         if (!classDetails) {
             return res.status(400).json({
-                message: "Class doesn't exist.",
+                message: "Class doesn't exist for the selected academic year.",
             });
         }
-        let coupon = oldStudent.coupon;
-        if (couponCode &&
-            !oldStudent.couponId) {
+        /* ============================================================
+           FIND SECTION
+        ============================================================ */
+        const section = await config_1.prisma.section.findUnique({
+            where: {
+                schoolId_classId_sectionName: {
+                    schoolId,
+                    classId: classDetails.id,
+                    sectionName,
+                },
+            },
+        });
+        if (!section) {
+            return res.status(400).json({
+                message: `Section ${sectionName} doesn't exist for class ${classNumber}.`,
+            });
+        }
+        /* ============================================================
+           COUPON
+        ============================================================ */
+        let coupon = null;
+        if (couponCode) {
             coupon =
                 await config_1.prisma.coupon.findUnique({
                     where: {
@@ -588,77 +778,39 @@ const editStudent = async (req, res) => {
                 });
             }
         }
-        const isNewClass = classNumber !==
-            oldStudent.class.classNumber;
-        const newArrears = isNewClass
-            ? oldStudent.pendingAmount
-            : arrears.amount;
-        const formattedFees = {
-            tieAmount: tie.amount,
-            tiePendingAmount: getUpdatedIndividualPendingAmount({
-                oldPendingAmount: oldStudent.tiePendingAmount,
-                oldAmount: oldStudent.tieAmount,
-                newAmount: tie.amount,
-            }),
-            beltAmount: belt.amount,
-            beltPendingAmount: getUpdatedIndividualPendingAmount({
-                oldPendingAmount: oldStudent.beltPendingAmount,
-                oldAmount: oldStudent.beltAmount,
-                newAmount: belt.amount,
-            }),
-            arrearsAmount: newArrears,
-            arrearsPendingAmount: isNewClass
-                ? newArrears
-                : getUpdatedIndividualPendingAmount({
-                    oldPendingAmount: oldStudent.arrearsPendingAmount,
-                    oldAmount: oldStudent.arrearsAmount,
-                    newAmount: arrears.amount,
-                }),
-            pendingTuitionFee: isNewClass
-                ? classDetails.tuitionFee
-                : getUpdatedIndividualPendingAmount({
-                    oldPendingAmount: oldStudent.pendingTuitionFee,
-                    oldAmount: oldStudent.class.tuitionFee,
-                    newAmount: classDetails.tuitionFee,
-                }),
-            pendingTextbookFee: isNewClass
-                ? classDetails.textBookFee
-                : getUpdatedIndividualPendingAmount({
-                    oldPendingAmount: oldStudent.pendingTextbookFee,
-                    oldAmount: oldStudent.class.textBookFee,
-                    newAmount: classDetails.textBookFee,
-                }),
-            pendingNotebookFee: isNewClass
-                ? classDetails.noteBookFee
-                : getUpdatedIndividualPendingAmount({
-                    oldPendingAmount: oldStudent.pendingNotebookFee,
-                    oldAmount: oldStudent.class.noteBookFee,
-                    newAmount: classDetails.noteBookFee,
-                }),
-            pendingDiaryAmount: isNewClass
-                ? classDetails.diaryFee
-                : getUpdatedIndividualPendingAmount({
-                    oldPendingAmount: oldStudent.pendingDiaryAmount,
-                    oldAmount: oldStudent.class.diaryFee,
-                    newAmount: classDetails.diaryFee,
-                }),
-        };
+        /* ============================================================
+           SIBLINGS
+    
+           Accept either:
+           - siblingStudentsFromDb
+           - siblings
+           - empty array
+        ============================================================ */
+        const siblingsFromDb = siblingStudentsFromDb ??
+            siblings ??
+            [];
+        const formattedSiblingArray = createSiblingsArray(siblingsFromDb);
+        /* ============================================================
+           PENDING AMOUNT
+        ============================================================ */
         const studentForCalculation = {
-            id: oldStudent.id,
-            tie: {
-                amount: formattedFees.tieAmount,
-            },
-            belt: {
-                amount: formattedFees.beltAmount,
-            },
-            arrears: {
-                amount: formattedFees.arrearsAmount,
-            },
+            tie,
+            belt,
+            arrears,
         };
-        const pendingAmount = await getPendingAmountAsync(studentForCalculation, classDetails, coupon);
-        await config_1.prisma.$transaction(async (tx) => {
-            if (coupon &&
-                !oldStudent.couponId) {
+        const pendingAmount = calculatePendingAmountSync({
+            student: studentForCalculation,
+            classDetails,
+            coupon,
+        });
+        /* ============================================================
+           UPDATE STUDENT
+        ============================================================ */
+        const updatedStudent = await config_1.prisma.$transaction(async (tx) => {
+            /* ------------------------------------------------------
+               APPLY COUPON
+            ------------------------------------------------------ */
+            if (coupon) {
                 await tx.coupon.update({
                     where: {
                         id: coupon.id,
@@ -668,34 +820,100 @@ const editStudent = async (req, res) => {
                     },
                 });
             }
-            await tx.student.update({
+            /* ------------------------------------------------------
+               UPDATE STUDENT
+            ------------------------------------------------------ */
+            return tx.student.update({
                 where: {
-                    id: oldStudent.id,
+                    id: student.id,
                 },
                 data: {
+                    /* -----------------------------------------------
+                       BASIC INFORMATION
+                    ----------------------------------------------- */
                     name,
                     aadhaar,
                     fatherName,
+                    motherName: motherName ?? null,
                     dob,
                     doj,
                     phone,
-                    classId: classDetails.id,
-                    couponId: coupon?.id ??
-                        oldStudent.couponId,
-                    siblings: createSiblingsArray(req.body
-                        .siblingStudentsFromDb ??
-                        []),
-                    ...formattedFees,
+                    /* -----------------------------------------------
+                       CLASS
+                    ----------------------------------------------- */
+                    class: {
+                        connect: {
+                            id: classDetails.id,
+                        },
+                    },
+                    /* -----------------------------------------------
+                       SECTION
+                    ----------------------------------------------- */
+                    section: {
+                        connect: {
+                            id: section.id,
+                        },
+                    },
+                    /* -----------------------------------------------
+                       ADDITIONAL FEES
+                    ----------------------------------------------- */
+                    tieAmount: tie.amount,
+                    tiePendingAmount: tie.pendingAmount,
+                    beltAmount: belt.amount,
+                    beltPendingAmount: belt.pendingAmount,
+                    arrearsAmount: arrears.amount,
+                    arrearsPendingAmount: arrears.pendingAmount,
+                    /* -----------------------------------------------
+                       CLASS FEES
+                    ----------------------------------------------- */
+                    pendingTuitionFee: classDetails.tuitionFee,
+                    pendingTextbookFee: classDetails.textBookFee,
+                    pendingNotebookFee: classDetails.noteBookFee,
+                    pendingDiaryAmount: classDetails.diaryFee,
+                    /* -----------------------------------------------
+                       SIBLINGS
+                    ----------------------------------------------- */
+                    siblings: formattedSiblingArray,
+                    /* -----------------------------------------------
+                       COUPON
+      
+                       Use relation instead of couponId because
+                       Prisma's generated client is expecting the
+                       nested relation.
+                    ----------------------------------------------- */
+                    ...(coupon
+                        ? {
+                            coupon: {
+                                connect: {
+                                    id: coupon.id,
+                                },
+                            },
+                        }
+                        : {}),
+                    /* -----------------------------------------------
+                       TOTAL PENDING
+                    ----------------------------------------------- */
                     pendingAmount,
                 },
             });
         });
+        /* ============================================================
+           SUCCESS
+        ============================================================ */
         return res.status(200).json({
-            message: "Student details edited successfully",
+            message: "Student updated successfully",
+            id: updatedStudent.id,
         });
     }
     catch (err) {
-        return (0, utils_1.handleErr)(err, res);
+        /* ============================================================
+           ERROR
+        ============================================================ */
+        console.error("EDIT STUDENT PRISMA ERROR:", err);
+        return res.status(500).json({
+            message: err?.message ??
+                "Unknown Prisma error",
+        });
     }
 };
 /* ============================================================
@@ -861,5 +1079,6 @@ exports.studentcontrollers = {
     getStudent,
     editStudent,
     groupStudentsByClassAndCount,
+    getStudentRegistrationOptions,
     promoteDemote,
 };

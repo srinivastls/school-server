@@ -13,6 +13,7 @@ const {
   editStudent,
   groupStudentsByClassAndCount,
   promoteDemote,
+  getStudentRegistrationOptions,
 } = studentcontrollers;
 
 export const useStudentRoutes = (app: Express) => {
@@ -37,4 +38,6 @@ export const useStudentRoutes = (app: Express) => {
   );
 
   app.post("/api/student/promoteDemote", [verifyToken], promoteDemote);
+
+  app.get("/api/student/registrationOptions", [verifyToken], getStudentRegistrationOptions);
 };
