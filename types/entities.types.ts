@@ -118,9 +118,6 @@ export type StudentType = {
 
   name: string;
 
-  /*
-   * Prisma Student.aadhaar is nullable.
-   */
   aadhaar?: string | null;
 
   fatherName: string;
@@ -134,6 +131,11 @@ export type StudentType = {
   phone?: string | null;
 
   classNumber: string;
+
+  /**
+   * Academic year associated with this student.
+   */
+  academicYearId?: string;
 
   sectionId?: string;
 
@@ -161,15 +163,49 @@ export type StudentType = {
 
   siblings: Sibling[];
 
-  /*
+  /**
    * Legacy compatibility only.
    *
-   * This is NOT used by Transaction.
    * Student.createdByAdminId is the Prisma field.
    */
   adminId?: string;
 };
 
+export type CreateStudentFormFields = {
+  admissionNo: string;
+
+  name: string;
+
+  aadhaar: string;
+
+  fatherName: string;
+
+  motherName?: string;
+
+  dob: string;
+
+  doj: string;
+
+  phoneNo: string;
+
+  tcNo?: string;
+
+  classNumber: string;
+
+  academicYearId: string;
+
+  tie: string;
+
+  diary: string;
+
+  belt: string;
+
+  arrears: string;
+
+  couponCode?: string;
+
+  siblings: Sibling[];
+};
 /* ============================================================
    PAYMENT MODE
 ============================================================ */
@@ -184,6 +220,8 @@ export type StudentType = {
  * ONLINE
  */
 export { PaymentMode };
+
+
 
 /* ============================================================
    TRANSACTION

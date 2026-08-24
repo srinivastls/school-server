@@ -153,6 +153,7 @@ const createStudent = async (
     phone,
     classNumber,
     academicYearId,
+    sectionName,
     tie,
     belt,
     arrears,
@@ -162,7 +163,12 @@ const createStudent = async (
 
   const schoolId = getSchoolId(req);
 
+  /* ============================================================
+     VALIDATION
+  ============================================================ */
+
   if (
+    !schoolId ||
     !admissionNo ||
     !name ||
     !aadhaar ||
@@ -172,39 +178,65 @@ const createStudent = async (
     !phone ||
     !classNumber ||
     !academicYearId ||
+    !sectionName ||
     !tie ||
     !belt ||
-    !arrears ||
-    !schoolId
+    !arrears
   ) {
     return res.status(400).json({
       message:
-        "schoolId, admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, tie, belt and arrears are required",
+        "schoolId, admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, sectionName, tie, belt and arrears are required",
     });
   }
 
   try {
-    /* --------------------------------------------------------
+    /* ============================================================
        FIND CLASS
-    -------------------------------------------------------- */
+    ============================================================ */
 
-    const classDetails = await prisma.class.findFirst({
-      where: {
-        schoolId,
-        academicYearId,
-        classNumber,
-      },
-    });
+    const classDetails =
+      await prisma.class.findUnique({
+        where: {
+          schoolId_academicYearId_classNumber: {
+            schoolId,
+            academicYearId,
+            classNumber,
+          },
+        },
+      });
 
     if (!classDetails) {
       return res.status(400).json({
-        message: "Class doesn't exist.",
+        message:
+          "Class doesn't exist for the selected academic year.",
       });
     }
 
-    /* --------------------------------------------------------
-       CHECK ADMISSION NUMBER
-    -------------------------------------------------------- */
+    /* ============================================================
+       FIND SECTION
+    ============================================================ */
+
+    const section =
+      await prisma.section.findUnique({
+        where: {
+          schoolId_classId_sectionName: {
+            schoolId,
+            classId: classDetails.id,
+            sectionName,
+          },
+        },
+      });
+
+    if (!section) {
+      return res.status(400).json({
+        message:
+          `Section ${sectionName} doesn't exist for class ${classNumber}.`,
+      });
+    }
+
+    /* ============================================================
+       CHECK DUPLICATE ADMISSION NUMBER
+    ============================================================ */
 
     const existingStudent =
       await prisma.student.findUnique({
@@ -223,35 +255,44 @@ const createStudent = async (
       });
     }
 
-    /* --------------------------------------------------------
+    /* ============================================================
        COUPON
-    -------------------------------------------------------- */
+    ============================================================ */
 
     let coupon: any = null;
 
     if (couponCode) {
-      coupon = await prisma.coupon.findUnique({
-        where: {
-          schoolId_code: {
-            schoolId,
-            code: couponCode,
+      coupon =
+        await prisma.coupon.findUnique({
+          where: {
+            schoolId_code: {
+              schoolId,
+              code: couponCode,
+            },
           },
-        },
-      });
+        });
 
       if (!coupon) {
         return res.status(400).json({
-          message: "Coupon doesn't exist.",
+          message:
+            "Coupon doesn't exist.",
         });
       }
 
-      if (coupon.status !== CouponStatus.ACTIVE) {
+      if (
+        coupon.status !==
+        CouponStatus.ACTIVE
+      ) {
         return res.status(400).json({
-          message: "Coupon is not active",
+          message:
+            "Coupon is not active",
         });
       }
 
-      if (coupon.classId !== classDetails.id) {
+      if (
+        coupon.classId !==
+        classDetails.id
+      ) {
         return res.status(400).json({
           message:
             "Coupon code invalid for this class",
@@ -259,21 +300,24 @@ const createStudent = async (
       }
     }
 
-    /* --------------------------------------------------------
+    /* ============================================================
        SIBLINGS
-    -------------------------------------------------------- */
+    ============================================================ */
 
     const siblingsFromDb =
       siblingStudentsFromDb ??
-      (req.body as any).siblingStudentsFromDb ??
+      (req.body as any)
+        .siblingStudentsFromDb ??
       [];
 
     const formattedSiblingArray =
-      createSiblingsArray(siblingsFromDb);
+      createSiblingsArray(
+        siblingsFromDb
+      );
 
-    /* --------------------------------------------------------
-       PENDING AMOUNTS
-    -------------------------------------------------------- */
+    /* ============================================================
+       PENDING AMOUNT
+    ============================================================ */
 
     const studentForCalculation = {
       tie,
@@ -283,84 +327,150 @@ const createStudent = async (
 
     const pendingAmount =
       calculatePendingAmountSync({
-        student: studentForCalculation,
+        student:
+          studentForCalculation,
+
         classDetails,
+
         coupon,
       });
 
-    /* --------------------------------------------------------
+    /* ============================================================
        CREATE STUDENT
-    -------------------------------------------------------- */
+    ============================================================ */
 
     const student =
-      await prisma.$transaction(async (tx) => {
-        if (coupon) {
-          await tx.coupon.update({
-            where: {
+      await prisma.$transaction(
+        async (tx) => {
+
+          /* ------------------------------------------------------
+             APPLY COUPON
+          ------------------------------------------------------ */
+
+          if (coupon) {
+            await tx.coupon.update({
+              where: {
+                id: coupon.id,
+              },
+
+              data: {
+                status:
+                  CouponStatus.APPLIED,
+              },
+            });
+          }
+
+          /* ------------------------------------------------------
+             CREATE
+          ------------------------------------------------------ */
+
+          return tx.student.create({
+  data: {
+    // SCHOOL
+    school: {
+      connect: {
+        id: schoolId,
+      },
+    },
+
+    // CLASS
+    class: {
+      connect: {
+        id: classDetails.id,
+      },
+    },
+
+    // SECTION
+    section: {
+      connect: {
+        id: section.id,
+      },
+    },
+
+    // BASIC INFORMATION
+    admissionNo,
+    name,
+    aadhaar,
+    fatherName,
+    dob,
+    doj,
+    phone,
+
+    // FEES
+    tieAmount: tie.amount,
+    tiePendingAmount: tie.pendingAmount,
+
+    beltAmount: belt.amount,
+    beltPendingAmount: belt.pendingAmount,
+
+    arrearsAmount: arrears.amount,
+    arrearsPendingAmount: arrears.pendingAmount,
+
+    // CLASS FEES
+    pendingTuitionFee: classDetails.tuitionFee,
+    pendingTextbookFee: classDetails.textBookFee,
+    pendingNotebookFee: classDetails.noteBookFee,
+    pendingDiaryAmount: classDetails.diaryFee,
+
+    // SIBLINGS
+    siblings: formattedSiblingArray,
+
+    // COUPON
+    ...(coupon
+      ? {
+          coupon: {
+            connect: {
               id: coupon.id,
             },
-            data: {
-              status: CouponStatus.APPLIED,
-            },
-          });
+          },
         }
+      : {}),
 
-        return tx.student.create({
-          data: {
-            schoolId,
+    // TOTAL PENDING
+    pendingAmount,
 
-            admissionNo,
-            name,
-            aadhaar,
-            fatherName,
-            dob,
-            doj,
-            phone,
+    // CREATED BY
+    ...(req.user?.id
+      ? {
+          createdByAdmin: {
+            connect: {
+              id: req.user.id,
+            },
+          },
+        }
+      : {}),
+  },
+});
+        }
+      );
 
-            classId: classDetails.id,
-
-            tieAmount: tie.amount,
-            tiePendingAmount: tie.pendingAmount,
-
-            beltAmount: belt.amount,
-            beltPendingAmount: belt.pendingAmount,
-
-            arrearsAmount: arrears.amount,
-            arrearsPendingAmount:
-              arrears.pendingAmount,
-
-            pendingTuitionFee:
-              classDetails.tuitionFee,
-
-            pendingTextbookFee:
-              classDetails.textBookFee,
-
-            pendingNotebookFee:
-              classDetails.noteBookFee,
-
-            pendingDiaryAmount:
-              classDetails.diaryFee,
-
-            siblings:
-              formattedSiblingArray,
-
-            couponId:
-              coupon?.id ?? null,
-
-            pendingAmount,
-
-            createdByAdminId:
-              req.user?.id ?? null,
-          } as any,
-        });
-      });
+    /* ============================================================
+       SUCCESS
+    ============================================================ */
 
     return res.status(201).json({
-      message: "Student created successfully",
+      message:
+        "Student created successfully",
+
       id: student.id,
     });
-  } catch (err) {
-    return handleErr(err as any, res);
+
+  } catch (err: any) {
+
+    /* ============================================================
+       PRISMA ERROR
+    ============================================================ */
+
+    console.error(
+      "CREATE STUDENT PRISMA ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      message:
+        err?.message ??
+        "Unknown Prisma error",
+    });
   }
 };
 

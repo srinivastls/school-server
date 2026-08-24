@@ -21,3 +21,4 @@ __exportStar(require("./coupon.controller"), exports);
 __exportStar(require("./student.controller"), exports);
 __exportStar(require("./transaction.controller"), exports);
 __exportStar(require("./report.controller"), exports);
+__exportStar(require("./academicYear.controller"), exports);

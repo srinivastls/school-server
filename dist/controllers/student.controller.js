@@ -77,9 +77,13 @@ const parseSiblings = (siblings) => {
    CREATE STUDENT
 ============================================================ */
 const createStudent = async (req, res) => {
-    const { admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, tie, belt, arrears, couponCode, siblingStudentsFromDb, } = req.body;
+    const { admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, sectionName, tie, belt, arrears, couponCode, siblingStudentsFromDb, } = req.body;
     const schoolId = getSchoolId(req);
-    if (!admissionNo ||
+    /* ============================================================
+       VALIDATION
+    ============================================================ */
+    if (!schoolId ||
+        !admissionNo ||
         !name ||
         !aadhaar ||
         !fatherName ||
@@ -88,33 +92,52 @@ const createStudent = async (req, res) => {
         !phone ||
         !classNumber ||
         !academicYearId ||
+        !sectionName ||
         !tie ||
         !belt ||
-        !arrears ||
-        !schoolId) {
+        !arrears) {
         return res.status(400).json({
-            message: "schoolId, admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, tie, belt and arrears are required",
+            message: "schoolId, admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, sectionName, tie, belt and arrears are required",
         });
     }
     try {
-        /* --------------------------------------------------------
+        /* ============================================================
            FIND CLASS
-        -------------------------------------------------------- */
-        const classDetails = await config_1.prisma.class.findFirst({
+        ============================================================ */
+        const classDetails = await config_1.prisma.class.findUnique({
             where: {
-                schoolId,
-                academicYearId,
-                classNumber,
+                schoolId_academicYearId_classNumber: {
+                    schoolId,
+                    academicYearId,
+                    classNumber,
+                },
             },
         });
         if (!classDetails) {
             return res.status(400).json({
-                message: "Class doesn't exist.",
+                message: "Class doesn't exist for the selected academic year.",
             });
         }
-        /* --------------------------------------------------------
-           CHECK ADMISSION NUMBER
-        -------------------------------------------------------- */
+        /* ============================================================
+           FIND SECTION
+        ============================================================ */
+        const section = await config_1.prisma.section.findUnique({
+            where: {
+                schoolId_classId_sectionName: {
+                    schoolId,
+                    classId: classDetails.id,
+                    sectionName,
+                },
+            },
+        });
+        if (!section) {
+            return res.status(400).json({
+                message: `Section ${sectionName} doesn't exist for class ${classNumber}.`,
+            });
+        }
+        /* ============================================================
+           CHECK DUPLICATE ADMISSION NUMBER
+        ============================================================ */
         const existingStudent = await config_1.prisma.student.findUnique({
             where: {
                 schoolId_admissionNo: {
@@ -128,45 +151,49 @@ const createStudent = async (req, res) => {
                 message: "Student with this admission number already exists",
             });
         }
-        /* --------------------------------------------------------
+        /* ============================================================
            COUPON
-        -------------------------------------------------------- */
+        ============================================================ */
         let coupon = null;
         if (couponCode) {
-            coupon = await config_1.prisma.coupon.findUnique({
-                where: {
-                    schoolId_code: {
-                        schoolId,
-                        code: couponCode,
+            coupon =
+                await config_1.prisma.coupon.findUnique({
+                    where: {
+                        schoolId_code: {
+                            schoolId,
+                            code: couponCode,
+                        },
                     },
-                },
-            });
+                });
             if (!coupon) {
                 return res.status(400).json({
                     message: "Coupon doesn't exist.",
                 });
             }
-            if (coupon.status !== types_1.CouponStatus.ACTIVE) {
+            if (coupon.status !==
+                types_1.CouponStatus.ACTIVE) {
                 return res.status(400).json({
                     message: "Coupon is not active",
                 });
             }
-            if (coupon.classId !== classDetails.id) {
+            if (coupon.classId !==
+                classDetails.id) {
                 return res.status(400).json({
                     message: "Coupon code invalid for this class",
                 });
             }
         }
-        /* --------------------------------------------------------
+        /* ============================================================
            SIBLINGS
-        -------------------------------------------------------- */
+        ============================================================ */
         const siblingsFromDb = siblingStudentsFromDb ??
-            req.body.siblingStudentsFromDb ??
+            req.body
+                .siblingStudentsFromDb ??
             [];
         const formattedSiblingArray = createSiblingsArray(siblingsFromDb);
-        /* --------------------------------------------------------
-           PENDING AMOUNTS
-        -------------------------------------------------------- */
+        /* ============================================================
+           PENDING AMOUNT
+        ============================================================ */
         const studentForCalculation = {
             tie,
             belt,
@@ -177,10 +204,13 @@ const createStudent = async (req, res) => {
             classDetails,
             coupon,
         });
-        /* --------------------------------------------------------
+        /* ============================================================
            CREATE STUDENT
-        -------------------------------------------------------- */
+        ============================================================ */
         const student = await config_1.prisma.$transaction(async (tx) => {
+            /* ------------------------------------------------------
+               APPLY COUPON
+            ------------------------------------------------------ */
             if (coupon) {
                 await tx.coupon.update({
                     where: {
@@ -191,9 +221,30 @@ const createStudent = async (req, res) => {
                     },
                 });
             }
+            /* ------------------------------------------------------
+               CREATE
+            ------------------------------------------------------ */
             return tx.student.create({
                 data: {
-                    schoolId,
+                    // SCHOOL
+                    school: {
+                        connect: {
+                            id: schoolId,
+                        },
+                    },
+                    // CLASS
+                    class: {
+                        connect: {
+                            id: classDetails.id,
+                        },
+                    },
+                    // SECTION
+                    section: {
+                        connect: {
+                            id: section.id,
+                        },
+                    },
+                    // BASIC INFORMATION
                     admissionNo,
                     name,
                     aadhaar,
@@ -201,31 +252,62 @@ const createStudent = async (req, res) => {
                     dob,
                     doj,
                     phone,
-                    classId: classDetails.id,
+                    // FEES
                     tieAmount: tie.amount,
                     tiePendingAmount: tie.pendingAmount,
                     beltAmount: belt.amount,
                     beltPendingAmount: belt.pendingAmount,
                     arrearsAmount: arrears.amount,
                     arrearsPendingAmount: arrears.pendingAmount,
+                    // CLASS FEES
                     pendingTuitionFee: classDetails.tuitionFee,
                     pendingTextbookFee: classDetails.textBookFee,
                     pendingNotebookFee: classDetails.noteBookFee,
                     pendingDiaryAmount: classDetails.diaryFee,
+                    // SIBLINGS
                     siblings: formattedSiblingArray,
-                    couponId: coupon?.id ?? null,
+                    // COUPON
+                    ...(coupon
+                        ? {
+                            coupon: {
+                                connect: {
+                                    id: coupon.id,
+                                },
+                            },
+                        }
+                        : {}),
+                    // TOTAL PENDING
                     pendingAmount,
-                    createdByAdminId: req.user?.id ?? null,
+                    // CREATED BY
+                    ...(req.user?.id
+                        ? {
+                            createdByAdmin: {
+                                connect: {
+                                    id: req.user.id,
+                                },
+                            },
+                        }
+                        : {}),
                 },
             });
         });
+        /* ============================================================
+           SUCCESS
+        ============================================================ */
         return res.status(201).json({
             message: "Student created successfully",
             id: student.id,
         });
     }
     catch (err) {
-        return (0, utils_1.handleErr)(err, res);
+        /* ============================================================
+           PRISMA ERROR
+        ============================================================ */
+        console.error("CREATE STUDENT PRISMA ERROR:", err);
+        return res.status(500).json({
+            message: err?.message ??
+                "Unknown Prisma error",
+        });
     }
 };
 /* ============================================================

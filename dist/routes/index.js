@@ -21,3 +21,4 @@ __exportStar(require("./coupon.routes"), exports);
 __exportStar(require("./student.routes"), exports);
 __exportStar(require("./transaction.routes"), exports);
 __exportStar(require("./report.routes"), exports);
+__exportStar(require("./academicYear.routes"), exports);
