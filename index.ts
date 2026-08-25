@@ -12,6 +12,7 @@ import {
   useStudentRoutes,
   useTransactionRoutes,
   useReportRoutes,
+  usePlatformRoutes,
 } from "./routes";
 
 dotenv.config();
@@ -75,6 +76,8 @@ useStudentRoutes(app);
 useTransactionRoutes(app);
 
 useReportRoutes(app);
+
+usePlatformRoutes(app);
 
 /* ============================================================
    SERVER

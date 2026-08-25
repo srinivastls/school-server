@@ -154,20 +154,23 @@ const isSuperAdmin = async (
   next: NextFunction
 ) => {
   try {
-    const userId =
-      req.userId;
+    const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({
-        message:
-          "Unauthorized",
+        message: "Unauthorized",
       });
     }
 
-    /*
-     * Platform admins live in
-     * PlatformAdmin, not User.
-     */
+    if (
+      req.user?.type !== "PLATFORM_ADMIN"
+    ) {
+      return res.status(403).json({
+        message:
+          "Invalid platform authentication",
+      });
+    }
+
     const platformAdmin =
       await prisma.platformAdmin.findUnique({
         where: {
@@ -199,30 +202,11 @@ const isSuperAdmin = async (
       });
     }
 
-    /*
-     * Make sure this is actually
-     * a platform token.
-     */
-    if (
-      req.user?.type &&
-      req.user.type !==
-        "PLATFORM_ADMIN"
-    ) {
-      return res.status(403).json({
-        message:
-          "Invalid platform authentication",
-      });
-    }
-
     next();
   } catch (err) {
-    return handleErr(
-      err,
-      res
-    );
+    return handleErr(err, res);
   }
 };
-
 /* ============================================================
    LOAD SCHOOL USER
 ============================================================ */

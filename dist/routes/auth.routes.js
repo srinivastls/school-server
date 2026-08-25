@@ -19,6 +19,10 @@ const useAuthRoutes = (app) => {
        They do NOT use schoolCode.
     ========================================================== */
     app.post("/api/auth/platform/signin", controllers_1.authController.platformAdminSignin);
+    app.post("/api/auth/change-password", [
+        middlewares_1.authJwt.verifyToken,
+        middlewares_1.authJwt.isSchoolUser,
+    ], controllers_1.authController.changePassword);
     /* ==========================================================
        SCHOOL USER SIGN IN
        

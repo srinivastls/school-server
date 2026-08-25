@@ -33,6 +33,8 @@ export type AuthSigninResponse = {
   schoolCode: string;
 
   schoolName: string;
+
+  mustChangePassword: boolean;
 };
 
 /* ============================================================
@@ -67,23 +69,23 @@ export type PlatformAdminSigninResponse = {
    Only PLATFORM_ADMIN can create a principal.
 ============================================================ */
 
-export type CreatePrincipalRequest = {
-  schoolId: string;
+// export type CreatePrincipalRequest = {
+//   schoolId: string;
 
-  name: string;
+//   name: string;
 
-  email: string;
+//   email: string;
 
-  password: string;
+//   password: string;
 
-  designation?: string;
+//   designation?: string;
 
-  phone?: string;
+//   phone?: string;
 
-  department?: string;
+//   department?: string;
 
-  employeeId?: string;
-};
+//   employeeId?: string;
+// };
 
 /* ============================================================
    CREATE SCHOOL ADMIN

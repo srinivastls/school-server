@@ -269,3 +269,39 @@ export type TransactionType = {
 
   recordedByUserId: string;
 };
+
+
+export type CreatePrincipalRequest = {
+  name: string;
+  email: string;
+  password: string;
+
+  designation?: string;
+  phone?: string;
+  department?: string;
+  employeeId?: string;
+};
+
+
+export type CreateSchoolRequest = {
+  code: string;
+  name: string;
+  address?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  logoUrl?: string;
+  board?: string;
+
+  subscriptionPlan?: string;
+
+  maxStudents?: number;
+  maxStaffAccounts?: number;
+
+  gracePeriodDays?: number;
+};
+
+export type ChangePasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+

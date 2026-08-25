@@ -22,3 +22,4 @@ __exportStar(require("./student.controller"), exports);
 __exportStar(require("./transaction.controller"), exports);
 __exportStar(require("./report.controller"), exports);
 __exportStar(require("./academicYear.controller"), exports);
+__exportStar(require("./platform.controller"), exports);

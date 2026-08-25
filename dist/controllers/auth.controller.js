@@ -139,6 +139,71 @@ const signin = async (req, res) => {
             schoolId: school.id,
             schoolCode: school.code,
             schoolName: school.name,
+            mustChangePassword: user.mustChangePassword,
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { currentPassword, newPassword, } = req.body;
+        if (!userId) {
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
+        }
+        if (!currentPassword ||
+            !newPassword) {
+            return res.status(400).json({
+                message: "Current password and new password are required",
+            });
+        }
+        if (newPassword.length < 8) {
+            return res.status(400).json({
+                message: "New password must be at least 8 characters",
+            });
+        }
+        if (currentPassword === newPassword) {
+            return res.status(400).json({
+                message: "New password must be different from current password",
+            });
+        }
+        const user = await config_1.prisma.user.findUnique({
+            where: {
+                id: userId,
+            },
+        });
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+        if (!user.isActive) {
+            return res.status(403).json({
+                message: "User account is inactive",
+            });
+        }
+        const passwordValid = await bcrypt_1.default.compare(currentPassword, user.passwordHash);
+        if (!passwordValid) {
+            return res.status(401).json({
+                message: "Current password is incorrect",
+            });
+        }
+        const passwordHash = await bcrypt_1.default.hash(newPassword, 10);
+        await config_1.prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                passwordHash,
+                mustChangePassword: false,
+            },
+        });
+        return res.status(200).json({
+            message: "Password changed successfully",
         });
     }
     catch (error) {
@@ -601,5 +666,6 @@ exports.authController = {
     createAdmin,
     createTeacher,
     createParent,
+    changePassword,
     delete: deleteUser,
 };

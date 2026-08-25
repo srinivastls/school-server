@@ -33,6 +33,14 @@ export const useAuthRoutes = (
     authController.platformAdminSignin
   );
 
+  app.post(
+  "/api/auth/change-password",
+  [
+    authJwt.verifyToken,
+    authJwt.isSchoolUser,
+  ],
+  authController.changePassword
+);
 
   /* ==========================================================
      SCHOOL USER SIGN IN

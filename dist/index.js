@@ -40,6 +40,7 @@ app.get("/", (req, res) => {
 (0, routes_1.useStudentRoutes)(app);
 (0, routes_1.useTransactionRoutes)(app);
 (0, routes_1.useReportRoutes)(app);
+(0, routes_1.usePlatformRoutes)(app);
 /* ============================================================
    SERVER
 ============================================================ */

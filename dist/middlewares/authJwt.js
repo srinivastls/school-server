@@ -72,10 +72,11 @@ const isSuperAdmin = async (req, res, next) => {
                 message: "Unauthorized",
             });
         }
-        /*
-         * Platform admins live in
-         * PlatformAdmin, not User.
-         */
+        if (req.user?.type !== "PLATFORM_ADMIN") {
+            return res.status(403).json({
+                message: "Invalid platform authentication",
+            });
+        }
         const platformAdmin = await config_1.prisma.platformAdmin.findUnique({
             where: {
                 id: userId,
@@ -95,17 +96,6 @@ const isSuperAdmin = async (req, res, next) => {
             client_1.PlatformAdminRole.PLATFORM_ADMIN) {
             return res.status(403).json({
                 message: "Require platform admin access",
-            });
-        }
-        /*
-         * Make sure this is actually
-         * a platform token.
-         */
-        if (req.user?.type &&
-            req.user.type !==
-                "PLATFORM_ADMIN") {
-            return res.status(403).json({
-                message: "Invalid platform authentication",
             });
         }
         next();

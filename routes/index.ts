@@ -6,3 +6,4 @@ export * from "./student.routes";
 export * from "./transaction.routes";
 export * from "./report.routes";
 export * from "./academicYear.routes"
+export * from "./platform.routes"

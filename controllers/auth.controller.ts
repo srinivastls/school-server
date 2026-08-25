@@ -23,6 +23,7 @@ import {
   DeleteUserRequest,
   RequestWithBody,
   Response,
+  ChangePasswordRequest,
 } from "../types";
 
 import { handleErr } from "../utils";
@@ -231,34 +232,133 @@ const signin = async (
     -------------------------------------------------------- */
 
     return res.status(200).json({
-      id:
-        user.id,
+  id: user.id,
 
-      accessToken,
+  accessToken,
 
-      accessTokenTTL:
-        ACCESS_TOKEN_TTL,
+  accessTokenTTL: ACCESS_TOKEN_TTL,
 
-      name:
-        user.name,
+  name: user.name,
 
-      email:
-        user.email,
+  email: user.email,
 
-      role:
-        user.role,
+  role: user.role,
 
-      designation:
-        user.designation,
+  designation: user.designation,
 
-      schoolId:
-        school.id,
+  schoolId: school.id,
 
-      schoolCode:
-        school.code,
+  schoolCode: school.code,
 
-      schoolName:
-        school.name,
+  schoolName: school.name,
+
+  mustChangePassword:
+    user.mustChangePassword,
+});
+  } catch (error) {
+    return handleErr(
+      error,
+      res
+    );
+  }
+};
+
+const changePassword = async (
+  req: RequestWithBody<ChangePasswordRequest>,
+  res: Response
+) => {
+  try {
+    const userId = req.userId;
+
+    const {
+      currentPassword,
+      newPassword,
+    } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    if (
+      !currentPassword ||
+      !newPassword
+    ) {
+      return res.status(400).json({
+        message:
+          "Current password and new password are required",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        message:
+          "New password must be at least 8 characters",
+      });
+    }
+
+    if (
+      currentPassword === newPassword
+    ) {
+      return res.status(400).json({
+        message:
+          "New password must be different from current password",
+      });
+    }
+
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        message:
+          "User account is inactive",
+      });
+    }
+
+    const passwordValid =
+      await bcrypt.compare(
+        currentPassword,
+        user.passwordHash
+      );
+
+    if (!passwordValid) {
+      return res.status(401).json({
+        message:
+          "Current password is incorrect",
+      });
+    }
+
+    const passwordHash =
+      await bcrypt.hash(
+        newPassword,
+        10
+      );
+
+    await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        passwordHash,
+        mustChangePassword: false,
+      },
+    });
+
+    return res.status(200).json({
+      message:
+        "Password changed successfully",
     });
   } catch (error) {
     return handleErr(
@@ -1063,6 +1163,7 @@ export const authController = {
   createAdmin,
   createTeacher,
   createParent,
+  changePassword,
 
   delete:
     deleteUser,
