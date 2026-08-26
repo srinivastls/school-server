@@ -9,7 +9,7 @@ import {
 
 export type AuthSigninRequest = {
   schoolCode: string;
-  email: string;
+  identifier: string;
   password: string;
 };
 
@@ -31,6 +31,7 @@ export type AuthSigninResponse = {
   schoolId: string;
 
   schoolCode: string;
+
 
   schoolName: string;
 

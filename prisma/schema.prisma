@@ -350,7 +350,7 @@ model User {
   profilePhotoUrl String? @map("profile_photo_url")
 
   isActive           Boolean   @default(true) @map("is_active")
-  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  mustChangePassword Boolean   @default(true) @map("must_change_password")
   lastLogin          DateTime? @map("last_login")
 
   createdAt DateTime @default(now()) @map("created_at")

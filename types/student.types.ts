@@ -14,8 +14,32 @@ export type CreateStudentRequest = Omit<
   | "pendingNotebookFee"
   | "pendingDiaryAmount"
 > & {
-  siblings: Omit<Sibling, "name">[];
-  siblingStudentsFromDb: Pick<StudentType, "admissionNo" | "name">[];
+  /* ============================================================
+     SIBLINGS
+  ============================================================ */
+
+  siblings: Omit<
+    Sibling,
+    "name"
+  >[];
+
+  siblingStudentsFromDb: Pick<
+    StudentType,
+    "admissionNo" | "name"
+  >[];
+
+  /* ============================================================
+     PARENT / GUARDIAN
+  ============================================================ */
+
+  parentName: string;
+
+  parentPhone: string;
+
+  parentRelationship:
+    | "FATHER"
+    | "MOTHER"
+    | "GUARDIAN";
 };
 
 export type GetClassStudentsRequest = Pick<ClassType, "classNumber">;

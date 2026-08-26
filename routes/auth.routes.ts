@@ -68,6 +68,14 @@ export const useAuthRoutes = (
   );
 
 
+  app.get(
+  "/api/auth/admins",
+  [
+    authJwt.verifyToken,
+    authJwt.isPrincipal,
+  ],
+  authController.getAdmins
+);
   /* ==========================================================
      CREATE PRINCIPAL
      
@@ -136,6 +144,26 @@ export const useAuthRoutes = (
     ],
     authController.createTeacher
   );
+
+  app.patch(
+    "/api/auth/teacher/:userId/status",
+  [
+  authJwt.verifyToken,
+  authJwt.isAdmin,
+  ],
+  authController.updateTeacherStatus
+);
+
+app.patch(
+  "/api/auth/admin/:userId/status",
+[
+authJwt.verifyToken,
+authJwt.isPrincipal,
+],
+authController.updateAdminStatus
+);
+
+
 
 
   /* ==========================================================

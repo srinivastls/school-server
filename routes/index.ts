@@ -7,3 +7,5 @@ export * from "./transaction.routes";
 export * from "./report.routes";
 export * from "./academicYear.routes"
 export * from "./platform.routes"
+export * from "./principal.routes"
+export * from "./parent.routes"

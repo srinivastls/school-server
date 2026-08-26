@@ -23,3 +23,5 @@ __exportStar(require("./transaction.routes"), exports);
 __exportStar(require("./report.routes"), exports);
 __exportStar(require("./academicYear.routes"), exports);
 __exportStar(require("./platform.routes"), exports);
+__exportStar(require("./principal.routes"), exports);
+__exportStar(require("./parent.routes"), exports);

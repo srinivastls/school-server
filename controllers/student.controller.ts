@@ -1,4 +1,12 @@
 import { prisma } from "../config";
+import bcrypt from "bcrypt";
+
+
+
+import {
+  RoleName,
+  StudentParentRelationship,
+} from "@prisma/client";
 
 import {
   RequestWithBody,
@@ -23,13 +31,7 @@ import { handleErr } from "../utils";
    HELPERS
 ============================================================ */
 
-const getSchoolId = (req: any): string | undefined => {
-  return (
-    req.user?.schoolId ??
-    req.body?.schoolId ??
-    req.query?.schoolId
-  );
-};
+
 
 const calculatePendingAmountSync = ({
   student,
@@ -139,27 +141,100 @@ const parseSiblings = (siblings: unknown): Sibling[] => {
    CREATE STUDENT
 ============================================================ */
 
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
+const getSchoolId = (req: any): string | undefined => {
+  return (
+    req.user?.schoolId ??
+    req.body?.schoolId ??
+    req.query?.schoolId
+  );
+};
+
+
+/* ============================================================
+   PARENT INTERNAL EMAIL
+   ------------------------------------------------------------
+   User.email is required in the current schema.
+
+   Parent login will use phone number, but we still need
+   an internal unique email value for the User record.
+============================================================ */
+
+
+
+
+/* ============================================================
+   CREATE STUDENT
+   ------------------------------------------------------------
+   Creates:
+
+   1. Student
+   2. Parent User
+   3. StudentParentLink
+
+   Everything happens inside one transaction.
+============================================================ */
+
 const createStudent = async (
   req: RequestWithBody<CreateStudentRequest>,
   res: Response
 ) => {
   const {
+    /* --------------------------------------------------------
+       STUDENT
+    -------------------------------------------------------- */
+
     admissionNo,
     name,
     aadhaar,
+
     fatherName,
+    motherName,
+
     dob,
     doj,
+
     phone,
+
+    /* --------------------------------------------------------
+       PARENT
+    -------------------------------------------------------- */
+
+    parentName,
+    parentPhone,
+    parentRelationship,
+
+    /* --------------------------------------------------------
+       ACADEMIC
+    -------------------------------------------------------- */
+
     classNumber,
     academicYearId,
     sectionName,
+
+    /* --------------------------------------------------------
+       FEES
+    -------------------------------------------------------- */
+
     tie,
     belt,
     arrears,
+
+    /* --------------------------------------------------------
+       OTHER
+    -------------------------------------------------------- */
+
     couponCode,
     siblingStudentsFromDb,
   } = req.body as any;
+
+  /* ------------------------------------------------------------
+     SCHOOL
+     ------------------------------------------------------------ */
 
   const schoolId = getSchoolId(req);
 
@@ -176,6 +251,7 @@ const createStudent = async (
     !dob ||
     !doj ||
     !phone ||
+    !parentRelationship ||
     !classNumber ||
     !academicYearId ||
     !sectionName ||
@@ -185,25 +261,57 @@ const createStudent = async (
   ) {
     return res.status(400).json({
       message:
-        "schoolId, admissionNo, name, aadhaar, fatherName, dob, doj, phone, classNumber, academicYearId, sectionName, tie, belt and arrears are required",
+        "schoolId, admissionNo, name, aadhaar, fatherName, dob, doj, phone, parentRelationship, classNumber, academicYearId, sectionName, tie, belt and arrears are required",
     });
   }
 
-  try {
-    /* ============================================================
-       FIND CLASS
-    ============================================================ */
+  /* ============================================================
+     VALIDATE PARENT RELATIONSHIP
+  ============================================================ */
 
-    const classDetails =
-      await prisma.class.findUnique({
-        where: {
-          schoolId_academicYearId_classNumber: {
-            schoolId,
-            academicYearId,
-            classNumber,
-          },
+  if (
+    ![
+      StudentParentRelationship.FATHER,
+      StudentParentRelationship.MOTHER,
+      StudentParentRelationship.GUARDIAN,
+    ].includes(parentRelationship)
+  ) {
+    return res.status(400).json({
+      message:
+        "parentRelationship must be FATHER, MOTHER or GUARDIAN",
+    });
+  }
+
+  /* ============================================================
+     NORMALIZE PARENT PHONE
+  ============================================================ */
+
+  const cleanParentPhone = String(phone ?? "").trim();
+
+  if (!cleanParentPhone) {
+    return res.status(400).json({
+      message: "Parent mobile number is required",
+    });
+  }
+
+  /* ============================================================
+     TRY
+  ============================================================ */
+
+  try {
+    /* ==========================================================
+       FIND CLASS
+    ========================================================== */
+
+    const classDetails = await prisma.class.findUnique({
+      where: {
+        schoolId_academicYearId_classNumber: {
+          schoolId,
+          academicYearId,
+          classNumber,
         },
-      });
+      },
+    });
 
     if (!classDetails) {
       return res.status(400).json({
@@ -212,20 +320,19 @@ const createStudent = async (
       });
     }
 
-    /* ============================================================
+    /* ==========================================================
        FIND SECTION
-    ============================================================ */
+    ========================================================== */
 
-    const section =
-      await prisma.section.findUnique({
-        where: {
-          schoolId_classId_sectionName: {
-            schoolId,
-            classId: classDetails.id,
-            sectionName,
-          },
+    const section = await prisma.section.findUnique({
+      where: {
+        schoolId_classId_sectionName: {
+          schoolId,
+          classId: classDetails.id,
+          sectionName,
         },
-      });
+      },
+    });
 
     if (!section) {
       return res.status(400).json({
@@ -234,19 +341,18 @@ const createStudent = async (
       });
     }
 
-    /* ============================================================
+    /* ==========================================================
        CHECK DUPLICATE ADMISSION NUMBER
-    ============================================================ */
+    ========================================================== */
 
-    const existingStudent =
-      await prisma.student.findUnique({
-        where: {
-          schoolId_admissionNo: {
-            schoolId,
-            admissionNo,
-          },
+    const existingStudent = await prisma.student.findUnique({
+      where: {
+        schoolId_admissionNo: {
+          schoolId,
+          admissionNo,
         },
-      });
+      },
+    });
 
     if (existingStudent) {
       return res.status(409).json({
@@ -255,69 +361,56 @@ const createStudent = async (
       });
     }
 
-    /* ============================================================
+    /* ==========================================================
        COUPON
-    ============================================================ */
+    ========================================================== */
 
     let coupon: any = null;
 
     if (couponCode) {
-      coupon =
-        await prisma.coupon.findUnique({
-          where: {
-            schoolId_code: {
-              schoolId,
-              code: couponCode,
-            },
+      coupon = await prisma.coupon.findUnique({
+        where: {
+          schoolId_code: {
+            schoolId,
+            code: couponCode,
           },
-        });
+        },
+      });
 
       if (!coupon) {
         return res.status(400).json({
-          message:
-            "Coupon doesn't exist.",
+          message: "Coupon doesn't exist.",
         });
       }
 
-      if (
-        coupon.status !==
-        CouponStatus.ACTIVE
-      ) {
+      if (coupon.status !== CouponStatus.ACTIVE) {
         return res.status(400).json({
-          message:
-            "Coupon is not active",
+          message: "Coupon is not active",
         });
       }
 
-      if (
-        coupon.classId !==
-        classDetails.id
-      ) {
+      if (coupon.classId !== classDetails.id) {
         return res.status(400).json({
-          message:
-            "Coupon code invalid for this class",
+          message: "Coupon code invalid for this class",
         });
       }
     }
 
-    /* ============================================================
+    /* ==========================================================
        SIBLINGS
-    ============================================================ */
+    ========================================================== */
 
     const siblingsFromDb =
       siblingStudentsFromDb ??
-      (req.body as any)
-        .siblingStudentsFromDb ??
+      (req.body as any).siblingStudentsFromDb ??
       [];
 
     const formattedSiblingArray =
-      createSiblingsArray(
-        siblingsFromDb
-      );
+      createSiblingsArray(siblingsFromDb);
 
-    /* ============================================================
+    /* ==========================================================
        PENDING AMOUNT
-    ============================================================ */
+    ========================================================== */
 
     const studentForCalculation = {
       tie,
@@ -325,124 +418,327 @@ const createStudent = async (
       arrears,
     };
 
-    const pendingAmount =
-      calculatePendingAmountSync({
-        student:
-          studentForCalculation,
+    const pendingAmount = calculatePendingAmountSync({
+      student: studentForCalculation,
+      classDetails,
+      coupon,
+    });
 
-        classDetails,
+    /* ==========================================================
+       FIND EXISTING PARENT
+       
+       IMPORTANT:
+       This is done BEFORE the transaction so we can also avoid
+       bcrypt hashing while the transaction is open.
+    ========================================================== */
 
-        coupon,
-      });
-
-    /* ============================================================
-       CREATE STUDENT
-    ============================================================ */
-
-    const student =
-      await prisma.$transaction(
-        async (tx) => {
-
-          /* ------------------------------------------------------
-             APPLY COUPON
-          ------------------------------------------------------ */
-
-          if (coupon) {
-            await tx.coupon.update({
-              where: {
-                id: coupon.id,
-              },
-
-              data: {
-                status:
-                  CouponStatus.APPLIED,
-              },
-            });
-          }
-
-          /* ------------------------------------------------------
-             CREATE
-          ------------------------------------------------------ */
-
-          return tx.student.create({
-  data: {
-    // SCHOOL
-    school: {
-      connect: {
-        id: schoolId,
+    const existingParent = await prisma.user.findFirst({
+      where: {
+        schoolId,
+        phone: cleanParentPhone,
+        role: RoleName.PARENT,
       },
-    },
+    });
 
-    // CLASS
-    class: {
-      connect: {
-        id: classDetails.id,
-      },
-    },
+    /* ==========================================================
+       PRE-CREATE PASSWORD HASH
 
-    // SECTION
-    section: {
-      connect: {
-        id: section.id,
-      },
-    },
+       bcrypt can take noticeable time, so don't execute it
+       inside the Prisma interactive transaction.
+    ========================================================== */
 
-    // BASIC INFORMATION
-    admissionNo,
-    name,
-    aadhaar,
-    fatherName,
-    dob,
-    doj,
-    phone,
+    let passwordHash: string | null = null;
 
-    // FEES
-    tieAmount: tie.amount,
-    tiePendingAmount: tie.pendingAmount,
+    if (!existingParent) {
+      passwordHash = await bcrypt.hash(
+        cleanParentPhone,
+        10
+      );
+    }
 
-    beltAmount: belt.amount,
-    beltPendingAmount: belt.pendingAmount,
+    /* ==========================================================
+       CREATE EVERYTHING
+       
+       Increased timeout from Prisma default 5000ms to 15000ms.
+    ========================================================== */
 
-    arrearsAmount: arrears.amount,
-    arrearsPendingAmount: arrears.pendingAmount,
+    const student = await prisma.$transaction(
+      async (tx) => {
+        /* ======================================================
+           APPLY COUPON
+        ====================================================== */
 
-    // CLASS FEES
-    pendingTuitionFee: classDetails.tuitionFee,
-    pendingTextbookFee: classDetails.textBookFee,
-    pendingNotebookFee: classDetails.noteBookFee,
-    pendingDiaryAmount: classDetails.diaryFee,
-
-    // SIBLINGS
-    siblings: formattedSiblingArray,
-
-    // COUPON
-    ...(coupon
-      ? {
-          coupon: {
-            connect: {
+        if (coupon) {
+          await tx.coupon.update({
+            where: {
               id: coupon.id,
             },
-          },
-        }
-      : {}),
 
-    // TOTAL PENDING
-    pendingAmount,
-
-    // CREATED BY
-    ...(req.user?.id
-      ? {
-          createdByAdmin: {
-            connect: {
-              id: req.user.id,
+            data: {
+              status: CouponStatus.APPLIED,
             },
-          },
+          });
         }
-      : {}),
-  },
-});
+
+        /* ======================================================
+           CREATE STUDENT
+        ====================================================== */
+
+        const createdStudent =
+          await tx.student.create({
+            data: {
+              /* ------------------------------------------------
+                 SCHOOL
+              ------------------------------------------------ */
+
+              school: {
+                connect: {
+                  id: schoolId,
+                },
+              },
+
+              /* ------------------------------------------------
+                 CLASS
+              ------------------------------------------------ */
+
+              class: {
+                connect: {
+                  id: classDetails.id,
+                },
+              },
+
+              /* ------------------------------------------------
+                 SECTION
+              ------------------------------------------------ */
+
+              section: {
+                connect: {
+                  id: section.id,
+                },
+              },
+
+              /* ------------------------------------------------
+                 BASIC INFORMATION
+              ------------------------------------------------ */
+
+              admissionNo,
+
+              name,
+
+              aadhaar,
+
+              fatherName,
+
+              motherName:
+                motherName ?? null,
+
+              dob,
+
+              doj,
+
+              phone,
+
+              /* ------------------------------------------------
+                 FEES
+              ------------------------------------------------ */
+
+              tieAmount:
+                tie.amount,
+
+              tiePendingAmount:
+                tie.pendingAmount,
+
+              beltAmount:
+                belt.amount,
+
+              beltPendingAmount:
+                belt.pendingAmount,
+
+              arrearsAmount:
+                arrears.amount,
+
+              arrearsPendingAmount:
+                arrears.pendingAmount,
+
+              /* ------------------------------------------------
+                 CLASS FEES
+              ------------------------------------------------ */
+
+              pendingTuitionFee:
+                classDetails.tuitionFee,
+
+              pendingTextbookFee:
+                classDetails.textBookFee,
+
+              pendingNotebookFee:
+                classDetails.noteBookFee,
+
+              pendingDiaryAmount:
+                classDetails.diaryFee,
+
+              /* ------------------------------------------------
+                 SIBLINGS
+              ------------------------------------------------ */
+
+              siblings:
+                formattedSiblingArray,
+
+              /* ------------------------------------------------
+                 COUPON
+              ------------------------------------------------ */
+
+              ...(coupon
+                ? {
+                    coupon: {
+                      connect: {
+                        id: coupon.id,
+                      },
+                    },
+                  }
+                : {}),
+
+              /* ------------------------------------------------
+                 TOTAL PENDING
+              ------------------------------------------------ */
+
+              pendingAmount,
+
+              /* ------------------------------------------------
+                 CREATED BY
+              ------------------------------------------------ */
+
+              ...(req.user?.id
+                ? {
+                    createdByAdmin: {
+                      connect: {
+                        id: req.user.id,
+                      },
+                    },
+                  }
+                : {}),
+            },
+          });
+
+        /* ======================================================
+           PARENT
+        ====================================================== */
+
+        let parentUser;
+
+        if (!existingParent) {
+          /* ----------------------------------------------------
+             INTERNAL EMAIL
+
+             Parent will login with mobile number.
+             Email is only maintained because the current
+             User schema requires it.
+          ---------------------------------------------------- */
+
+          const parentEmail =
+            createParentInternalEmail(
+              schoolId,
+              cleanParentPhone
+            );
+
+          /* ----------------------------------------------------
+             CREATE PARENT
+             
+             passwordHash was calculated BEFORE transaction.
+          ---------------------------------------------------- */
+
+          parentUser =
+            await tx.user.create({
+              data: {
+                schoolId,
+
+                name:
+                  String(parentName ?? "").trim(),
+
+                email:
+                  parentEmail,
+
+                passwordHash:
+                  passwordHash!,
+
+                phone:
+                  cleanParentPhone,
+
+                role:
+                  RoleName.PARENT,
+
+                designation:
+                  "Parent",
+
+                isActive:
+                  true,
+
+                mustChangePassword:
+                  true,
+              },
+            });
+        } else {
+          /* ----------------------------------------------------
+             EXISTING PARENT
+          ---------------------------------------------------- */
+
+          parentUser =
+            existingParent;
         }
-      );
+
+        /* ======================================================
+           CHECK EXISTING STUDENT ↔ PARENT LINK
+        ====================================================== */
+
+        const existingParentLink =
+          await tx.studentParentLink.findUnique({
+            where: {
+              studentId_parentUserId: {
+                studentId:
+                  createdStudent.id,
+
+                parentUserId:
+                  parentUser.id,
+              },
+            },
+          });
+
+        /* ======================================================
+           CREATE STUDENT ↔ PARENT LINK
+        ====================================================== */
+
+        if (!existingParentLink) {
+          await tx.studentParentLink.create({
+            data: {
+              studentId:
+                createdStudent.id,
+
+              parentUserId:
+                parentUser.id,
+
+              relationship:
+                parentRelationship,
+
+              isPrimary:
+                true,
+            },
+          });
+        }
+
+        /* ======================================================
+           RETURN STUDENT
+        ====================================================== */
+
+        return createdStudent;
+      },
+
+      /* ========================================================
+         PRISMA TRANSACTION OPTIONS
+      ======================================================== */
+
+      {
+        timeout: 15000,
+      }
+    );
 
     /* ============================================================
        SUCCESS
@@ -450,13 +746,13 @@ const createStudent = async (
 
     return res.status(201).json({
       message:
-        "Student created successfully",
+        "Student and parent account created successfully",
 
-      id: student.id,
+      id:
+        student.id,
     });
 
   } catch (err: any) {
-
     /* ============================================================
        PRISMA ERROR
     ============================================================ */
@@ -1647,6 +1943,16 @@ const promoteDemote = async (
   } catch (err) {
     return handleErr(err as any, res);
   }
+};
+
+
+const createParentInternalEmail = (
+  schoolId: string,
+  phone: string
+) => {
+  const cleanPhone = phone.replace(/\D/g, "");
+
+  return `parent_${schoolId}_${cleanPhone}@school.local`;
 };
 
 /* ============================================================

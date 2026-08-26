@@ -2,7 +2,7 @@ import { Express } from "express";
 import { transactionControllers } from "../controllers/transaction.controller";
 import { authJwt } from "../middlewares";
 
-const { verifyToken, isSuperAdmin } = authJwt;
+const { verifyToken, isPrincipal } = authJwt;
 const { recordTxn, getStudentTxns, getTotalTxnAmount } = transactionControllers;
 
 export const useTransactionRoutes = (app: Express) => {
@@ -12,7 +12,7 @@ export const useTransactionRoutes = (app: Express) => {
 
   app.post(
     "/api/txn/getTotalTxnAmount",
-    [verifyToken, isSuperAdmin],
+    [verifyToken, isPrincipal],
     getTotalTxnAmount
   );
 };

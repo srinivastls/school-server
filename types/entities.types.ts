@@ -172,6 +172,7 @@ export type StudentType = {
 };
 
 export type CreateStudentFormFields = {
+
   admissionNo: string;
 
   name: string;

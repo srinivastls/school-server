@@ -13,6 +13,8 @@ import {
   useTransactionRoutes,
   useReportRoutes,
   usePlatformRoutes,
+  usePrincipalRoutes,
+  useParentRoutes
 } from "./routes";
 
 dotenv.config();
@@ -78,6 +80,10 @@ useTransactionRoutes(app);
 useReportRoutes(app);
 
 usePlatformRoutes(app);
+
+usePrincipalRoutes(app);
+
+useParentRoutes(app);
 
 /* ============================================================
    SERVER

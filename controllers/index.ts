@@ -7,3 +7,4 @@ export * from "./transaction.controller";
 export * from "./report.controller";
 export * from "./academicYear.controller";
 export * from "./platform.controller"
+export * from "./principal.controller";

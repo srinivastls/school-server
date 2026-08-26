@@ -43,6 +43,10 @@ const useAuthRoutes = (app) => {
        based on role.
     ========================================================== */
     app.post("/api/auth/signin", controllers_1.authController.signin);
+    app.get("/api/auth/admins", [
+        middlewares_1.authJwt.verifyToken,
+        middlewares_1.authJwt.isPrincipal,
+    ], controllers_1.authController.getAdmins);
     /* ==========================================================
        CREATE PRINCIPAL
        
@@ -92,6 +96,14 @@ const useAuthRoutes = (app) => {
         middlewares_1.authJwt.verifyToken,
         middlewares_1.authJwt.isAdmin,
     ], controllers_1.authController.createTeacher);
+    app.patch("/api/auth/teacher/:userId/status", [
+        middlewares_1.authJwt.verifyToken,
+        middlewares_1.authJwt.isAdmin,
+    ], controllers_1.authController.updateTeacherStatus);
+    app.patch("/api/auth/admin/:userId/status", [
+        middlewares_1.authJwt.verifyToken,
+        middlewares_1.authJwt.isPrincipal,
+    ], controllers_1.authController.updateAdminStatus);
     /* ==========================================================
        CREATE PARENT
        

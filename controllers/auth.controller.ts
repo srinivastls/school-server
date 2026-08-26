@@ -22,6 +22,7 @@ import {
   CreateParentRequest,
   DeleteUserRequest,
   RequestWithBody,
+  Request,
   Response,
   ChangePasswordRequest,
 } from "../types";
@@ -63,16 +64,19 @@ const getAuthenticatedSchoolId = (
       schoolCode + email + password
 ============================================================ */
 
+
 const signin = async (
   req: RequestWithBody<AuthSigninRequest>,
   res: Response<AuthSigninResponse>
 ) => {
   try {
+
     const {
       schoolCode,
-      email,
+      identifier,
       password,
     } = req.body;
+
 
     /* --------------------------------------------------------
        VALIDATION
@@ -80,22 +84,24 @@ const signin = async (
 
     if (
       !schoolCode ||
-      !email ||
+      !identifier ||
       !password
     ) {
       return res.status(400).json({
         message:
-          "schoolCode, email and password are required",
+          "schoolCode, identifier and password are required",
       });
     }
+
 
     const normalizedSchoolCode =
       normalizeSchoolCode(
         schoolCode
       );
 
-    const normalizedEmail =
-      normalizeEmail(email);
+    const normalizedIdentifier =
+      identifier.trim();
+
 
     /* --------------------------------------------------------
        FIND SCHOOL
@@ -109,6 +115,7 @@ const signin = async (
         },
       });
 
+
     if (!school) {
       return res.status(401).json({
         message:
@@ -116,35 +123,114 @@ const signin = async (
       });
     }
 
+
     /* --------------------------------------------------------
        SCHOOL STATUS
     -------------------------------------------------------- */
 
-    if (school.status !== "ACTIVE") {
+    if (
+      school.status !== "ACTIVE"
+    ) {
       return res.status(403).json({
         message:
           "School account is not active",
       });
     }
 
+
     /* --------------------------------------------------------
        FIND USER
        
-       Email is unique within a school.
+       Email:
+         Principal
+         Admin
+         Teacher
+         Parent
+
+       Mobile:
+         Parent only
     -------------------------------------------------------- */
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          schoolId_email: {
+    let user;
+
+
+    /* --------------------------------------------------------
+       EMAIL LOGIN
+    -------------------------------------------------------- */
+
+    if (
+      normalizedIdentifier.includes("@")
+    ) {
+
+      const normalizedEmail =
+        normalizeEmail(
+          normalizedIdentifier
+        );
+
+
+      user =
+        await prisma.user.findUnique({
+          where: {
+            schoolId_email: {
+              schoolId:
+                school.id,
+
+              email:
+                normalizedEmail,
+            },
+          },
+        });
+
+    }
+
+
+    /* --------------------------------------------------------
+       MOBILE LOGIN
+       
+       Parent login only
+    -------------------------------------------------------- */
+
+    else {
+
+      const normalizedPhone =
+        normalizedIdentifier.replace(
+          /\D/g,
+          ""
+        );
+
+
+      if (
+        normalizedPhone.length !== 10
+      ) {
+        return res.status(400).json({
+          message:
+            "Please enter a valid 10-digit mobile number",
+        });
+      }
+
+
+      user =
+        await prisma.user.findFirst({
+          where: {
+
             schoolId:
               school.id,
 
-            email:
-              normalizedEmail,
+            phone:
+              normalizedPhone,
+
+            role:
+              RoleName.PARENT,
+
           },
-        },
-      });
+        });
+
+    }
+
+
+    /* --------------------------------------------------------
+       USER NOT FOUND
+    -------------------------------------------------------- */
 
     if (!user) {
       return res.status(401).json({
@@ -152,6 +238,7 @@ const signin = async (
           "Invalid school code or credentials",
       });
     }
+
 
     /* --------------------------------------------------------
        USER STATUS
@@ -164,6 +251,7 @@ const signin = async (
       });
     }
 
+
     /* --------------------------------------------------------
        PASSWORD
     -------------------------------------------------------- */
@@ -174,6 +262,7 @@ const signin = async (
         user.passwordHash
       );
 
+
     if (!passwordValid) {
       return res.status(401).json({
         message:
@@ -181,13 +270,15 @@ const signin = async (
       });
     }
 
+
     /* --------------------------------------------------------
        LAST LOGIN
     -------------------------------------------------------- */
 
     await prisma.user.update({
       where: {
-        id: user.id,
+        id:
+          user.id,
       },
 
       data: {
@@ -195,6 +286,7 @@ const signin = async (
           new Date(),
       },
     });
+
 
     /* --------------------------------------------------------
        JWT
@@ -227,42 +319,56 @@ const signin = async (
         }
       );
 
+
     /* --------------------------------------------------------
        RESPONSE
     -------------------------------------------------------- */
 
     return res.status(200).json({
-  id: user.id,
 
-  accessToken,
+      id:
+        user.id,
 
-  accessTokenTTL: ACCESS_TOKEN_TTL,
+      accessToken,
 
-  name: user.name,
+      accessTokenTTL:
+        ACCESS_TOKEN_TTL,
 
-  email: user.email,
+      name:
+        user.name,
 
-  role: user.role,
+      email:
+        user.email,
 
-  designation: user.designation,
+      role:
+        user.role,
 
-  schoolId: school.id,
+      designation:
+        user.designation,
 
-  schoolCode: school.code,
+      schoolId:
+        school.id,
 
-  schoolName: school.name,
+      schoolCode:
+        school.code,
 
-  mustChangePassword:
-    user.mustChangePassword,
-});
+      schoolName:
+        school.name,
+
+      mustChangePassword:
+        user.mustChangePassword,
+
+    });
+
   } catch (error) {
+
     return handleErr(
       error,
       res
     );
+
   }
 };
-
 const changePassword = async (
   req: RequestWithBody<ChangePasswordRequest>,
   res: Response
@@ -951,6 +1057,127 @@ const createTeacher = async (
   }
 };
 
+
+
+const getTeachers = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const schoolId =
+      getAuthenticatedSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message:
+          "Authenticated school is missing",
+      });
+    }
+
+    const teachers =
+      await prisma.user.findMany({
+        where: {
+          schoolId,
+          role: RoleName.TEACHER,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          designation: true,
+          department: true,
+          employeeId: true,
+          profilePhotoUrl: true,
+          isActive: true,
+          lastLogin: true,
+          createdAt: true,
+        },
+
+        orderBy: {
+          name: "asc",
+        },
+      });
+
+    return res.status(200).json({
+      teachers,
+    });
+  } catch (error) {
+    return handleErr(
+      error,
+      res
+    );
+  }
+};
+
+
+const updateTeacherStatus = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { userId } = req.params;
+    const { isActive } = req.body;
+
+    const schoolId =
+      getAuthenticatedSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(401).json({
+        message: "Authenticated school is missing",
+      });
+    }
+
+    if (!userId || typeof isActive !== "boolean") {
+      return res.status(400).json({
+        message:
+          "userId and isActive are required",
+      });
+    }
+
+    const teacher =
+      await prisma.user.findFirst({
+        where: {
+          id: userId,
+          schoolId,
+          role: RoleName.TEACHER,
+        },
+      });
+
+    if (!teacher) {
+      return res.status(404).json({
+        message: "Teacher not found",
+      });
+    }
+
+    const updatedTeacher =
+      await prisma.user.update({
+        where: {
+          id: teacher.id,
+        },
+        data: {
+          isActive,
+        },
+      });
+
+    return res.status(200).json({
+      message: isActive
+        ? "Teacher account activated successfully"
+        : "Teacher account deactivated successfully",
+
+      teacher: {
+        id: updatedTeacher.id,
+        name: updatedTeacher.name,
+        email: updatedTeacher.email,
+        isActive: updatedTeacher.isActive,
+      },
+    });
+  } catch (error) {
+    return handleErr(error, res);
+  }
+};
+
 /* ============================================================
    CREATE PARENT
    ------------------------------------------------------------
@@ -1053,6 +1280,132 @@ const createParent = async (
     );
   }
 };
+
+
+/* ============================================================
+   GET SCHOOL ADMINS
+   ------------------------------------------------------------
+   PRINCIPAL ONLY
+============================================================ */
+
+const getAdmins = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const schoolId =
+      getAuthenticatedSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(401).json({
+        message:
+          "Authenticated school is missing",
+      });
+    }
+
+    const admins =
+      await prisma.user.findMany({
+        where: {
+          schoolId,
+          role: RoleName.ADMIN,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          designation: true,
+          department: true,
+          employeeId: true,
+          profilePhotoUrl: true,
+          isActive: true,
+          mustChangePassword: true,
+          lastLogin: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+
+        orderBy: {
+          name: "asc",
+        },
+      });
+
+    return res.status(200).json({
+      admins,
+    });
+  } catch (error) {
+    return handleErr(
+      error,
+      res
+    );
+  }
+};
+
+
+const updateAdminStatus = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const schoolId =
+      getAuthenticatedSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(401).json({
+        message:
+          "Authenticated school is missing",
+      });
+    }
+
+    const { userId } = req.params;
+    const { isActive } = req.body;
+
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+
+    if (!user) {
+      return res.status(404).json({
+        message:
+          "User not found",
+      });
+    }
+
+    if (user.role !== RoleName.ADMIN) {
+      return res.status(400).json({
+        message:
+          "Only admin users can have their status updated",
+      });
+    }
+
+    const updatedUser =
+      await prisma.user.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          isActive,
+        },
+      });
+
+    return res.status(200).json({
+      message:
+        "Admin status updated successfully",
+
+      user: updatedUser,
+    });
+  } catch (error) {
+    return handleErr(
+      error,
+      res
+    );
+  }
+};
+
 
 /* ============================================================
    DELETE SCHOOL USER
@@ -1164,6 +1517,10 @@ export const authController = {
   createTeacher,
   createParent,
   changePassword,
+  getAdmins,
+  getTeachers,
+  updateTeacherStatus,
+  updateAdminStatus,
 
   delete:
     deleteUser,

@@ -90,6 +90,11 @@ const verifyToken = (
           typeof decoded !== "object" ||
           decoded === null
         ) {
+          console.log(
+            "JWT verification error:",
+            token,
+            err
+          );
           return res.status(401).json({
             message:
               "Unauthorized",
@@ -222,7 +227,7 @@ const getAuthenticatedSchoolUser =
     if (!userId) {
       res.status(401).json({
         message:
-          "Unauthorized",
+          "Unauthorized ser ",
       });
 
       return null;
