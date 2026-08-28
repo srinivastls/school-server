@@ -350,7 +350,7 @@ const signin = async (
         school.id,
 
       schoolCode:
-        school.code,
+        school.code ,
 
       schoolName:
         school.name,

@@ -84,6 +84,10 @@ const getSchoolId = (req) => {
         req.body?.schoolId ??
         req.query?.schoolId);
 };
+const getAcademicYearId = (req) => {
+    return (req.body?.academicYearId ??
+        req.query?.academicYearId);
+};
 /* ============================================================
    PARENT INTERNAL EMAIL
    ------------------------------------------------------------
@@ -532,6 +536,35 @@ const getStudentsByClass = async (req, res) => {
             where: {
                 schoolId,
                 classId: classDetails.id,
+            },
+            select: {
+                admissionNo: true,
+                name: true,
+            },
+            orderBy: {
+                admissionNo: "asc",
+            },
+        });
+        return res.status(200).json({
+            students,
+        });
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
+};
+// get all the studnets of a school
+const getAllStudents = async (req, res) => {
+    try {
+        const schoolId = getSchoolId(req);
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "schoolId is required",
+            });
+        }
+        const students = await config_1.prisma.student.findMany({
+            where: {
+                schoolId,
             },
             select: {
                 admissionNo: true,
@@ -1111,21 +1144,87 @@ const editStudent = async (req, res) => {
 /* ============================================================
    GROUP STUDENTS BY CLASS
 ============================================================ */
+// const groupStudentsByClassAndCount = async (
+//   req: Request,
+//   res: Response<ClassStudentCountResponse>
+// ) => {
+//   try {
+//     const schoolId = getSchoolId(req);
+//     if (!schoolId) {
+//       return res.status(400).json({
+//         message: "schoolId is required",
+//       });
+//     }
+//     const groupedStudents =
+//       await prisma.student.groupBy({
+//         by: ["classId"],
+//         where: {
+//           schoolId,
+//         },
+//         _count: {
+//           id: true,
+//         },
+//       });
+//     const responseData: {
+//       classNumber: string;
+//       count: string;
+//     }[] = [];
+//     for (const group of groupedStudents) {
+//       const classDetails =
+//         await prisma.class.findFirst({
+//           where: {
+//             id: group.classId,
+//             schoolId,
+//           },
+//         });
+//       if (
+//         classDetails &&
+//         !classDetails.isCompleted
+//       ) {
+//         responseData.push({
+//           classNumber:
+//             classDetails.classNumber,
+//           count:
+//             String(group._count.id),
+//         });
+//       }
+//     }
+//     responseData.sort(
+//       (a, b) =>
+//         Number(a.classNumber) -
+//         Number(b.classNumber)
+//     );
+//     return res.status(200).json({
+//       countData: responseData,
+//     });
+//   } catch (err) {
+//     return handleErr(err as any, res);
+//   }
+// };
 const groupStudentsByClassAndCount = async (req, res) => {
     try {
         const schoolId = getSchoolId(req);
+        const academicYearId = getAcademicYearId(req);
         if (!schoolId) {
             return res.status(400).json({
                 message: "schoolId is required",
+            });
+        }
+        if (!academicYearId) {
+            return res.status(400).json({
+                message: "academicYearId is required",
             });
         }
         const groupedStudents = await config_1.prisma.student.groupBy({
             by: ["classId"],
             where: {
                 schoolId,
+                class: {
+                    academicYearId,
+                },
             },
             _count: {
-                id: true,
+                _all: true,
             },
         });
         const responseData = [];
@@ -1134,18 +1233,17 @@ const groupStudentsByClassAndCount = async (req, res) => {
                 where: {
                     id: group.classId,
                     schoolId,
+                    academicYearId,
                 },
             });
-            if (classDetails &&
-                !classDetails.isCompleted) {
+            if (classDetails && !classDetails.isCompleted) {
                 responseData.push({
                     classNumber: classDetails.classNumber,
-                    count: String(group._count.id),
+                    count: String(group._count._all),
                 });
             }
         }
-        responseData.sort((a, b) => Number(a.classNumber) -
-            Number(b.classNumber));
+        responseData.sort((a, b) => Number(a.classNumber) - Number(b.classNumber));
         return res.status(200).json({
             countData: responseData,
         });
@@ -1274,6 +1372,7 @@ exports.studentcontrollers = {
     getStudentByCoupon,
     getStudent,
     editStudent,
+    getAllStudents,
     groupStudentsByClassAndCount,
     getStudentRegistrationOptions,
     promoteDemote,

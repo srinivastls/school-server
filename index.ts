@@ -14,7 +14,14 @@ import {
   useReportRoutes,
   usePlatformRoutes,
   usePrincipalRoutes,
-  useParentRoutes
+  useParentRoutes,
+  useAttendanceRoutes,
+  useTeacherAttendanceRoutes,
+  useLeaveRoutes,
+  useStudentPromotionRoutes,
+  useAcademicYearRoutes,
+  useClassTeacherRoutes
+
 } from "./routes";
 
 dotenv.config();
@@ -85,6 +92,17 @@ usePrincipalRoutes(app);
 
 useParentRoutes(app);
 
+useAcademicYearRoutes(app);
+
+useAttendanceRoutes(app);
+
+useLeaveRoutes(app);
+
+useStudentPromotionRoutes(app);
+
+useClassTeacherRoutes(app);
+
+//useTeacherAttendanceRoutes(app);
 /* ============================================================
    SERVER
 ============================================================ */

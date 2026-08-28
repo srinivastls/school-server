@@ -8,3 +8,11 @@ export * from "./report.controller";
 export * from "./academicYear.controller";
 export * from "./platform.controller"
 export * from "./principal.controller";
+export * from "./attendance.controller";
+export * from "./teacherAttendance.controller";
+export * from "./attendanceReports.controller";
+export * from "./leave.controller";
+export * from "./attendanceDashboard.controller";
+export * from "./studentPromotion.controller";
+export * from "./classTeacher.controller";
+export * from "./teacherStudentMapping.controller";

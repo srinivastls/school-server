@@ -7,3 +7,4 @@ export * from "./coupon.types";
 export * from "./student.types";
 export * from "./transaction.types";
 export * from "./report.types";
+export * from "./attendance.types";

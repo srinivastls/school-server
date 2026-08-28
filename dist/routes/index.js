@@ -25,3 +25,8 @@ __exportStar(require("./academicYear.routes"), exports);
 __exportStar(require("./platform.routes"), exports);
 __exportStar(require("./principal.routes"), exports);
 __exportStar(require("./parent.routes"), exports);
+__exportStar(require("./attendance.routes"), exports);
+__exportStar(require("./teacherAttendance.routes"), exports);
+__exportStar(require("./leave.routes"), exports);
+__exportStar(require("./studentPromotion.routes"), exports);
+__exportStar(require("./classTeacher.routes"), exports);

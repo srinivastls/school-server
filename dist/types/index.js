@@ -23,3 +23,4 @@ __exportStar(require("./coupon.types"), exports);
 __exportStar(require("./student.types"), exports);
 __exportStar(require("./transaction.types"), exports);
 __exportStar(require("./report.types"), exports);
+__exportStar(require("./attendance.types"), exports);

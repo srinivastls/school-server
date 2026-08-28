@@ -1,7 +1,7 @@
 import { Express } from "express";
 
 import {
-  academicYearControllers,
+  teacherSubjectMappingControllers,
 } from "../controllers";
 
 import {
@@ -9,81 +9,72 @@ import {
 } from "../middlewares";
 
 
-export const useAcademicYearRoutes = (
+export const useTeacherSubjectMappingRoutes = (
   app: Express
 ) => {
 
   /* ==========================================================
-     GET ALL
-     
-     GET /academic-year
+     GET TEACHERS
   ========================================================== */
 
   app.get(
-    "/api/academic-year",
+    "/teacher-subject/teachers",
     authJwt.verifyToken,
-    academicYearControllers.getAcademicYears
+    authJwt.isPrincipal,
+    teacherSubjectMappingControllers
+      .getTeachersForMapping
   );
 
 
   /* ==========================================================
-     GET CURRENT
-     
-     GET /academic-year/current
+     GET CLASSES / SUBJECTS / SECTIONS
   ========================================================== */
 
   app.get(
-    "/api/academic-year/current",
+    "/teacher-subject/options",
     authJwt.verifyToken,
-    academicYearControllers.getCurrentAcademicYear
+    authJwt.isPrincipal,
+    teacherSubjectMappingControllers
+      .getSubjectsForMapping
   );
 
 
   /* ==========================================================
-     GET BY ID
-     
-     GET /academic-year/:academicYearId
+     GET MAPPINGS
   ========================================================== */
 
   app.get(
-    "/academic-year/:academicYearId",
+    "/teacher-subject",
     authJwt.verifyToken,
-    academicYearControllers.getAcademicYearById
+    authJwt.isPrincipal,
+    teacherSubjectMappingControllers
+      .getTeacherSubjectMappings
   );
 
 
   /* ==========================================================
-     CREATE
-     
-     POST /academic-year
+     ASSIGN
   ========================================================== */
 
   app.post(
-    "/api/academic-year",
+    "/teacher-subject",
     authJwt.verifyToken,
     authJwt.isPrincipal,
-    academicYearControllers.createAcademicYear
+    teacherSubjectMappingControllers
+      .assignTeacherSubject
   );
 
 
   /* ==========================================================
-     SET CURRENT
-     
-     PATCH /academic-year/:academicYearId/current
+     DELETE
   ========================================================== */
 
-  app.patch(
-    "/api/academic-year/:academicYearId/current",
+  app.delete(
+    "/teacher-subject/:mappingId",
     authJwt.verifyToken,
     authJwt.isPrincipal,
-    academicYearControllers.setCurrentAcademicYear
+    teacherSubjectMappingControllers
+      .deleteTeacherSubjectMapping
   );
-
-  app.post(
-  "/api/academic-year/populate",
-  authJwt.verifyToken,
-  authJwt.isPrincipal,
-  academicYearControllers.populateAcademicYear
-);
 
 };

@@ -3,18 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
-}
-
-enum EnrollmentStatus {
-  ACTIVE
-  PROMOTED
-  DEMOTED
-  RETAINED
-  TRANSFERRED
-  LEFT
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model PlatformAdmin {
@@ -36,85 +26,71 @@ model PlatformAdmin {
 }
 
 model School {
-  id                         String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                       String
-  address                    String?
-  contactEmail               String?                     @map("contact_email")
-  contactPhone               String?                     @map("contact_phone")
-  logoUrl                    String?                     @map("logo_url")
-  board                      String?
-  timezone                   String                      @default("Asia/Kolkata")
-  locale                     String                      @default("en-IN")
-  subscriptionPlan           SubscriptionPlan            @default(FREE) @map("subscription_plan")
-  subscriptionStartDate      DateTime?                   @map("subscription_start_date")
-  subscriptionExpiryDate     DateTime?                   @map("subscription_expiry_date")
-  gracePeriodDays            Int                         @default(7) @map("grace_period_days")
-  status                     SchoolStatus                @default(ONBOARDING)
-  featureFlags               Json                        @default("{}") @map("feature_flags")
-  maxStudents                Int                         @default(100) @map("max_students")
-  maxStaffAccounts           Int                         @default(5) @map("max_staff_accounts")
-  billingNotes               String?                     @map("billing_notes")
-  createdByPlatformAdminId   String?                     @map("created_by_platform_admin_id")
-  createdAt                  DateTime                    @default(now()) @map("created_at")
-  updatedAt                  DateTime                    @default(now()) @map("updated_at")
-  code                       String                      @unique @db.VarChar(50)
-  academicYears              AcademicYear[]
-  announcements              Announcement[]
-  attendances                Attendance[]
-  auditLogs                  AuditLog[]
-  classes                    Class[]
-  complaints                 Complaint[]
-  coupons                    Coupon[]
-  examTimetables             ExamTimetable[]
-  exams                      Exam[]
-  idCardTemplates            IDCardTemplate[]
-  idCards                    IDCard[]
-  leaveRequests              LeaveRequest[]
-  marks                      Mark[]
-  notifications              Notification[]
-  onboardingLogs             SchoolOnboardingLog[]
-  createdByPlatformAdmin     PlatformAdmin?              @relation("SchoolCreatedBy", fields: [createdByPlatformAdminId], references: [id])
-  sections                   Section[]
-  students                   Student[]
-  subjects                   Subject[]
-  teacherAttendances         TeacherAttendance[]
-  teacherMappings            TeacherSubjectMapping[]
-  timetables                 Timetable[]
-  transactions               Transaction[]
-  transferCertificates       TransferCertificate[]
-  users                      User[]
-  StudentAcademicEnrollments StudentAcademicEnrollment[]
-  studentPromotions          StudentPromotion[]
+  id                       String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                     String
+  address                  String?
+  contactEmail             String?                 @map("contact_email")
+  contactPhone             String?                 @map("contact_phone")
+  logoUrl                  String?                 @map("logo_url")
+  board                    String?
+  timezone                 String                  @default("Asia/Kolkata")
+  locale                   String                  @default("en-IN")
+  subscriptionPlan         SubscriptionPlan        @default(FREE) @map("subscription_plan")
+  subscriptionStartDate    DateTime?               @map("subscription_start_date")
+  subscriptionExpiryDate   DateTime?               @map("subscription_expiry_date")
+  gracePeriodDays          Int                     @default(7) @map("grace_period_days")
+  status                   SchoolStatus            @default(ONBOARDING)
+  featureFlags             Json                    @default("{}") @map("feature_flags")
+  maxStudents              Int                     @default(100) @map("max_students")
+  maxStaffAccounts         Int                     @default(5) @map("max_staff_accounts")
+  billingNotes             String?                 @map("billing_notes")
+  createdByPlatformAdminId String?                 @map("created_by_platform_admin_id")
+  createdAt                DateTime                @default(now()) @map("created_at")
+  updatedAt                DateTime                @default(now()) @map("updated_at")
+  code                     String?                 @db.VarChar(50)
+  academicYears            AcademicYear[]
+  announcements            Announcement[]
+  attendances              Attendance[]
+  auditLogs                AuditLog[]
+  classes                  Class[]
+  complaints               Complaint[]
+  coupons                  Coupon[]
+  examTimetables           ExamTimetable[]
+  exams                    Exam[]
+  idCardTemplates          IDCardTemplate[]
+  idCards                  IDCard[]
+  leaveRequests            LeaveRequest[]
+  marks                    Mark[]
+  notifications            Notification[]
+  onboardingLogs           SchoolOnboardingLog[]
+  createdByPlatformAdmin   PlatformAdmin?          @relation("SchoolCreatedBy", fields: [createdByPlatformAdminId], references: [id])
+  sections                 Section[]
+  students                 Student[]
+  subjects                 Subject[]
+  teacherAttendances       TeacherAttendance[]
+  teacherMappings          TeacherSubjectMapping[]
+  timetables               Timetable[]
+  transactions             Transaction[]
+  transferCertificates     TransferCertificate[]
+  users                    User[]
 
   @@map("schools")
 }
 
 model AcademicYear {
-  id String @id @default(uuid())
-
-  schoolId String @map("school_id") @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  name      String
-  startDate DateTime @map("start_date")
-  endDate   DateTime @map("end_date")
-  isCurrent Boolean  @default(false) @map("is_current")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
+  id              String                  @id @default(uuid())
+  schoolId        String                  @map("school_id") @db.Uuid
+  name            String
+  startDate       DateTime                @map("start_date")
+  endDate         DateTime                @map("end_date")
+  isCurrent       Boolean                 @default(false) @map("is_current")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+  school          School                  @relation(fields: [schoolId], references: [id])
   classes         Class[]
   exams           Exam[]
-  teacherMappings TeacherSubjectMapping[]
   idCards         IDCard[]
-
-  attendances Attendance[]
-
-  StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionsFrom StudentPromotion[] @relation("StudentPromotionFromYear")
-
-  promotionsTo StudentPromotion[] @relation("StudentPromotionToYear")
+  teacherMappings TeacherSubjectMapping[]
 
   @@unique([schoolId, name])
   @@index([schoolId, isCurrent])
@@ -139,8 +115,8 @@ model User {
   createdAt                DateTime                @default(now()) @map("created_at")
   updatedAt                DateTime                @updatedAt @map("updated_at")
   announcements            Announcement[]
+  attendances              Attendance[]
   auditLogs                AuditLog[]
-  attendanceMarkedByUser   Attendance[]            @relation("AttendanceMarkedBy")
   assignedComplaints       Complaint[]             @relation("ComplaintAssignedTo")
   submittedComplaints      Complaint[]             @relation("ComplaintSubmittedBy")
   couponsApproved          Coupon[]                @relation("CouponApprovedBy")
@@ -159,7 +135,6 @@ model User {
   teacherAttendances       TeacherAttendance[]
   teacherMappings          TeacherSubjectMapping[]
   timetables               Timetable[]
-  studentPromotions        StudentPromotion[]      @relation("StudentPromotedBy")
   transactions             Transaction[]           @relation("TransactionRecordedBy")
   issuedTCs                TransferCertificate[]   @relation("TCIssuedBy")
   school                   School                  @relation(fields: [schoolId], references: [id])
@@ -171,68 +146,31 @@ model User {
 }
 
 model Class {
-  id                         String                      @id @default(uuid())
-  schoolId                   String                      @map("school_id") @db.Uuid
-  academicYearId             String                      @map("academic_year_id")
-  classNumber                String                      @map("class_number")
-  displayName                String                      @map("display_name")
-  tuitionFee                 String                      @map("tuition_fee")
-  textBookFee                String                      @map("text_book_fee")
-  noteBookFee                String                      @map("note_book_fee")
-  diaryFee                   String                      @map("diary_fee")
-  isCompleted                Boolean                     @default(false) @map("is_completed")
-  createdAt                  DateTime                    @default(now()) @map("created_at")
-  updatedAt                  DateTime                    @updatedAt @map("updated_at")
-  academicYear               AcademicYear                @relation(fields: [academicYearId], references: [id])
-  school                     School                      @relation(fields: [schoolId], references: [id])
-  coupons                    Coupon[]
-  examSubjects               ExamSubject[]
-  examTimetables             ExamTimetable[]
-  sections                   Section[]
-  students                   Student[]
-  subjects                   Subject[]
-  timetables                 Timetable[]
-  attendances                Attendance[]
-  StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionsFrom StudentPromotion[] @relation("StudentPromotionFromClass")
-
-  promotionsTo StudentPromotion[] @relation("StudentPromotionToClass")
+  id             String          @id @default(uuid())
+  schoolId       String          @map("school_id") @db.Uuid
+  academicYearId String          @map("academic_year_id")
+  classNumber    String          @map("class_number")
+  displayName    String          @map("display_name")
+  tuitionFee     String          @map("tuition_fee")
+  textBookFee    String          @map("text_book_fee")
+  noteBookFee    String          @map("note_book_fee")
+  diaryFee       String          @map("diary_fee")
+  isCompleted    Boolean         @default(false) @map("is_completed")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  academicYear   AcademicYear    @relation(fields: [academicYearId], references: [id])
+  school         School          @relation(fields: [schoolId], references: [id])
+  coupons        Coupon[]
+  examSubjects   ExamSubject[]
+  examTimetables ExamTimetable[]
+  sections       Section[]
+  students       Student[]
+  subjects       Subject[]
+  timetables     Timetable[]
 
   @@unique([schoolId, academicYearId, classNumber])
   @@index([schoolId])
   @@map("classes")
-}
-
-model StudentAcademicEnrollment {
-  id String @id @default(uuid())
-
-  schoolId String @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  academicYearId String
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-
-  studentId String
-  student   Student @relation(fields: [studentId], references: [id])
-
-  classId String
-  class   Class  @relation(fields: [classId], references: [id])
-
-  sectionId String
-  section   Section @relation(fields: [sectionId], references: [id])
-
-  enrollmentStatus EnrollmentStatus
-
-  promotedFromClassId   String?
-  promotedFromSectionId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([schoolId, academicYearId, studentId])
-  @@index([schoolId, academicYearId, classId])
-  @@index([schoolId, academicYearId, sectionId])
 }
 
 model Section {
@@ -249,13 +187,6 @@ model Section {
   students        Student[]
   teacherMappings TeacherSubjectMapping[]
   timetables      Timetable[]
-  attendances     Attendance[]
-
-  StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionsFrom StudentPromotion[] @relation("StudentPromotionFromSection")
-
-  promotionsTo StudentPromotion[] @relation("StudentPromotionToSection")
 
   @@unique([schoolId, classId, sectionName])
   @@index([schoolId])
@@ -353,10 +284,6 @@ model Student {
   transactions         Transaction[]
   transferCertificates TransferCertificate[]
 
-  StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionHistory StudentPromotion[]
-
   @@unique([schoolId, admissionNo])
   @@index([schoolId])
   @@index([schoolId, classId])
@@ -433,41 +360,22 @@ model Transaction {
 }
 
 model Attendance {
-  id String @id @default(uuid())
-
-  schoolId String @map("school_id") @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  studentId String  @map("student_id")
-  student   Student @relation(fields: [studentId], references: [id])
-
-  classId String @map("class_id")
-  class   Class  @relation(fields: [classId], references: [id])
-
-  sectionId String  @map("section_id")
-  section   Section @relation(fields: [sectionId], references: [id])
-
-  academicYearId String       @map("academic_year_id")
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-
-  date DateTime @db.Date
-
-  status AttendanceStatus
-
-  markedByUserId String @map("marked_by_user_id")
-  markedByUser   User   @relation("AttendanceMarkedBy", fields: [markedByUserId], references: [id])
-
-  remark String?
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String           @id @default(uuid())
+  schoolId       String           @map("school_id") @db.Uuid
+  studentId      String
+  date           DateTime
+  status         AttendanceStatus
+  markedByUserId String
+  remark         String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  users          User             @relation(fields: [markedByUserId], references: [id])
+  school         School           @relation(fields: [schoolId], references: [id])
+  students       Student          @relation(fields: [studentId], references: [id])
 
   @@unique([schoolId, studentId, date])
   @@index([schoolId, date])
-  @@index([schoolId, classId, date])
-  @@index([schoolId, sectionId, date])
   @@index([schoolId, studentId])
-  @@index([schoolId, academicYearId])
   @@map("attendances")
 }
 
@@ -791,79 +699,6 @@ model SchoolOnboardingLog {
   @@index([schoolId, performedAt])
   @@index([platformAdminId, performedAt])
   @@map("school_onboarding_logs")
-}
-
-// ============================================================
-// STUDENT PROMOTION / ACADEMIC HISTORY
-// ============================================================
-
-enum PromotionStatus {
-  PROMOTED
-  DEMOTED
-  REPEATED
-  NOT_PROMOTED
-}
-
-model StudentPromotion {
-  id String @id @default(uuid())
-
-  schoolId String @map("school_id") @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  studentId String  @map("student_id")
-  student   Student @relation(fields: [studentId], references: [id])
-
-  fromAcademicYearId String       @map("from_academic_year_id")
-  fromAcademicYear   AcademicYear @relation("StudentPromotionFromYear", fields: [fromAcademicYearId], references: [id])
-
-  toAcademicYearId String?       @map("to_academic_year_id")
-  toAcademicYear   AcademicYear? @relation("StudentPromotionToYear", fields: [toAcademicYearId], references: [id])
-
-  fromClassId String @map("from_class_id")
-  fromClass   Class  @relation("StudentPromotionFromClass", fields: [fromClassId], references: [id])
-
-  fromSectionId String?  @map("from_section_id")
-  fromSection   Section? @relation("StudentPromotionFromSection", fields: [fromSectionId], references: [id])
-
-  toClassId String? @map("to_class_id")
-  toClass   Class?  @relation("StudentPromotionToClass", fields: [toClassId], references: [id])
-
-  toSectionId String?  @map("to_section_id")
-  toSection   Section? @relation("StudentPromotionToSection", fields: [toSectionId], references: [id])
-
-  status PromotionStatus
-
-  remark String?
-
-  promotedByUserId String @map("promoted_by_user_id")
-  promotedByUser   User   @relation("StudentPromotedBy", fields: [promotedByUserId], references: [id])
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@unique([schoolId, studentId, fromAcademicYearId, toAcademicYearId])
-  @@index([schoolId])
-  @@index([schoolId, studentId])
-  @@index([schoolId, fromAcademicYearId])
-  @@index([schoolId, toAcademicYearId])
-  @@map("student_promotions")
-}
-
-
-
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model prisma_migrations_backup_20260827 {
-  id                  String?   @db.VarChar(36)
-  checksum            String?   @db.VarChar(64)
-  finished_at         DateTime? @db.Timestamptz(6)
-  migration_name      String?   @db.VarChar(255)
-  logs                String?
-  rolled_back_at      DateTime? @db.Timestamptz(6)
-  started_at          DateTime? @db.Timestamptz(6)
-  applied_steps_count Int?
-
-  @@map("_prisma_migrations_backup_20260827")
-  @@ignore
 }
 
 enum RoleName {
