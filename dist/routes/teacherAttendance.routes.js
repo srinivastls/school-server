@@ -13,6 +13,8 @@ const middlewares_1 = require("../middlewares");
 const useTeacherAttendanceRoutes = (app) => {
     app.get("/list", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
         .getTeachersForAttendance);
+    app.get("/api/attendance/student/my-sections", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getTeacherAssignedSections);
+    app.get("/api/teacher-attendance/my-sections", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getTeacherAssignedSections);
     /* ============================================================
        MARK / UPDATE TEACHER ATTENDANCE
     ============================================================ */
@@ -22,6 +24,14 @@ const useTeacherAttendanceRoutes = (app) => {
      */
     app.post("/mark", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
         .markTeacherAttendance);
+    app.get("/api/attendance/student/my-section-students", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers
+        .getTeacherSectionStudents);
+    app.get("/api/attendance/student/my-section-attendance", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getTeacherSectionAttendance);
+    app.post("/api/attendance/student/my-section-attendance", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.saveTeacherSectionAttendance);
+    app.get("/api/attendance/student/my-student-attendance-history", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getTeacherStudentAttendanceHistory);
+    app.get("/api/attendance/student/my-students", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getTeacherMyStudents);
+    app.get("/api/teacher-attendance/my-attendance", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getMyTeacherAttendance);
+    app.get("/api/teacher-attendance/my-attendance/today", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getMyTeacherAttendanceToday);
     /* ============================================================
        DAILY REPORT
     ============================================================ */

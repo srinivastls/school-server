@@ -32,3 +32,8 @@ __exportStar(require("./attendanceDashboard.controller"), exports);
 __exportStar(require("./studentPromotion.controller"), exports);
 __exportStar(require("./classTeacher.controller"), exports);
 __exportStar(require("./teacherStudentMapping.controller"), exports);
+__exportStar(require("./teacher.controller"), exports);
+__exportStar(require("./teacherMarks.controllers"), exports);
+__exportStar(require("./teacherLeave.controllers"), exports);
+__exportStar(require("./teacherProfile.controllers"), exports);
+__exportStar(require("./teacherTimetable.controllers"), exports);

@@ -48,7 +48,11 @@ app.get("/", (req, res) => {
 (0, routes_1.useLeaveRoutes)(app);
 (0, routes_1.useStudentPromotionRoutes)(app);
 (0, routes_1.useClassTeacherRoutes)(app);
-//useTeacherAttendanceRoutes(app);
+(0, routes_1.useTeacherAttendanceRoutes)(app);
+(0, routes_1.useTeacherLeaveRoutes)(app);
+(0, routes_1.useTeacherMarksRoutes)(app);
+(0, routes_1.useTeacherProfileRoutes)(app);
+(0, routes_1.useTeacherTimetableRoutes)(app);
 /* ============================================================
    SERVER
 ============================================================ */

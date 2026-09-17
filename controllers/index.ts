@@ -16,3 +16,8 @@ export * from "./attendanceDashboard.controller";
 export * from "./studentPromotion.controller";
 export * from "./classTeacher.controller";
 export * from "./teacherStudentMapping.controller";
+export * from "./teacher.controller";
+export * from "./teacherMarks.controllers";
+export * from "./teacherLeave.controllers";
+export * from "./teacherProfile.controllers";
+export * from "./teacherTimetable.controllers";

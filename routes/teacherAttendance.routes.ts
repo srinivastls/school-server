@@ -31,6 +31,21 @@ app.get(
 );
 
 
+
+app.get(
+  "/api/attendance/student/my-sections",
+    authJwt.verifyToken,
+    authJwt.isTeacher,
+  teacherAttendanceControllers.getTeacherAssignedSections
+);
+
+app.get(
+  "/api/teacher-attendance/my-sections",
+    authJwt.verifyToken,
+    authJwt.isTeacher,
+  teacherAttendanceControllers.getTeacherAssignedSections
+);
+
 /* ============================================================
    MARK / UPDATE TEACHER ATTENDANCE
 ============================================================ */
@@ -48,6 +63,57 @@ app.post(
 );
 
 
+app.get(
+  "/api/attendance/student/my-section-students",
+  authJwt.verifyToken,
+  authJwt.isTeacher,
+  teacherAttendanceControllers
+    .getTeacherSectionStudents
+);
+
+
+app.get(
+  "/api/attendance/student/my-section-attendance",
+  authJwt.verifyToken,
+  authJwt.isTeacher,
+  teacherAttendanceControllers.getTeacherSectionAttendance
+);
+
+app.post(
+  "/api/attendance/student/my-section-attendance",
+  authJwt.verifyToken,
+  authJwt.isTeacher,
+  teacherAttendanceControllers.saveTeacherSectionAttendance
+);
+
+
+app.get(
+  "/api/attendance/student/my-student-attendance-history",
+  authJwt.verifyToken,
+  authJwt.isTeacher,
+  teacherAttendanceControllers.getTeacherStudentAttendanceHistory
+);
+
+app.get(
+  "/api/attendance/student/my-students",
+  authJwt.verifyToken,
+  authJwt.isTeacher,
+  teacherAttendanceControllers.getTeacherMyStudents
+);
+
+app.get(
+  "/api/teacher-attendance/my-attendance",
+  authJwt.verifyToken,
+  authJwt.isTeacher,
+  teacherAttendanceControllers.getMyTeacherAttendance
+);
+
+app.get(
+  "/api/teacher-attendance/my-attendance/today",
+  authJwt.verifyToken,
+  authJwt.isTeacher,
+  teacherAttendanceControllers.getMyTeacherAttendanceToday
+);
 /* ============================================================
    DAILY REPORT
 ============================================================ */

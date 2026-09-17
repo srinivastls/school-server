@@ -20,7 +20,12 @@ import {
   useLeaveRoutes,
   useStudentPromotionRoutes,
   useAcademicYearRoutes,
-  useClassTeacherRoutes
+  useClassTeacherRoutes,
+  useTeacherMarksRoutes,
+  useTeacherLeaveRoutes,
+  useTeacherProfileRoutes,
+  useTeacherTimetableRoutes,
+  
 
 } from "./routes";
 
@@ -102,7 +107,13 @@ useStudentPromotionRoutes(app);
 
 useClassTeacherRoutes(app);
 
-//useTeacherAttendanceRoutes(app);
+useTeacherAttendanceRoutes(app);
+
+useTeacherLeaveRoutes(app);
+
+useTeacherMarksRoutes(app);
+useTeacherProfileRoutes(app);
+useTeacherTimetableRoutes(app);
 /* ============================================================
    SERVER
 ============================================================ */
