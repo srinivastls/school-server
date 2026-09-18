@@ -136,7 +136,7 @@ const bootstrap = async () => {
     await prisma.$connect();
 
     console.log(
-      "connected to postgres"
+      "connected to postgres sql"
     );
 
     /* --------------------------------------------------------
