@@ -153,11 +153,11 @@ const assignClassTeacher = async (
         },
       });
 
-    if (existingAssignment) {
-      return res.status(409).json({
-        message: `${teacher.name} is already class teacher for Class ${existingAssignment.class.classNumber} - Section ${existingAssignment.sectionName}`,
-      });
-    }
+    // if (existingAssignment) {
+    //   return res.status(409).json({
+    //     message: `${teacher.name} is already class teacher for Class ${existingAssignment.class.classNumber} - Section ${existingAssignment.sectionName}`,
+    //   });
+    // }
 
     /* --------------------------------------------------------
        ASSIGN

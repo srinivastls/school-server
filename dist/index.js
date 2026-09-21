@@ -66,7 +66,7 @@ const bootstrap = async () => {
            CONNECT DATABASE
         -------------------------------------------------------- */
         await config_1.prisma.$connect();
-        console.log("connected to postgres");
+        console.log("connected to postgres sql");
         /* --------------------------------------------------------
            START SERVER
         -------------------------------------------------------- */

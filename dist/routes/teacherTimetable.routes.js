@@ -37,6 +37,6 @@ exports.useTeacherTimetableRoutes = void 0;
 const middlewares_1 = require("../middlewares");
 const teacherTimetableControllers = __importStar(require("../controllers/"));
 const useTeacherTimetableRoutes = (app) => {
-    app.get("/my-timetable", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, teacherTimetableControllers.getMyTimetable);
+    app.get("/api/teacher-timetable/my-timetable", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, teacherTimetableControllers.getMyTimetable);
 };
 exports.useTeacherTimetableRoutes = useTeacherTimetableRoutes;

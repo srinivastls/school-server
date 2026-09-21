@@ -594,7 +594,7 @@ const getAvailableClassTeachers = async (req, res) => {
 const getStudentsBySection = async (req, res) => {
     try {
         const schoolId = getSchoolId(req);
-        const sectionId = req.params.sectionId;
+        const sectionId = req.query.sectionId;
         if (!schoolId) {
             return res.status(400).json({
                 message: "schoolId is required",

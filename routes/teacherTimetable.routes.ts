@@ -6,7 +6,7 @@ import * as teacherTimetableControllers from "../controllers/";
 export const useTeacherTimetableRoutes = (app: Express) => {
 
 app.get(
-  "/my-timetable",
+  "/api/teacher-timetable/my-timetable",
   authJwt.verifyToken,
     authJwt.isTeacher,
   teacherTimetableControllers.getMyTimetable

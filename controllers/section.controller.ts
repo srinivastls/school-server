@@ -1503,9 +1503,9 @@ const getStudentsBySection = async (
   try {
 
     const schoolId =
-      getSchoolId(req);
+  getSchoolId(req);
 
-    const sectionId = req.params.sectionId;
+const sectionId = req.query.sectionId as string;
 
     if (!schoolId) {
       return res.status(400).json({
