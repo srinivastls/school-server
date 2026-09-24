@@ -25,6 +25,8 @@ import {
   useTeacherLeaveRoutes,
   useTeacherProfileRoutes,
   useTeacherTimetableRoutes,
+  useAdminDashboardRoutes,
+  useAdminAttendanceLeaveRoutes
   
 
 } from "./routes";
@@ -78,7 +80,6 @@ app.get(
 ============================================================ */
 
 useAuthRoutes(app);
-
 useUserRoutes(app);
 
 useClassRoutes(app);
@@ -114,6 +115,8 @@ useTeacherLeaveRoutes(app);
 useTeacherMarksRoutes(app);
 useTeacherProfileRoutes(app);
 useTeacherTimetableRoutes(app);
+useAdminDashboardRoutes(app);
+useAdminAttendanceLeaveRoutes(app);
 /* ============================================================
    SERVER
 ============================================================ */

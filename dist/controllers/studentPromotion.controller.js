@@ -100,6 +100,15 @@ const getPromotionStudents = async (req, res) => {
                 id: true,
                 classNumber: true,
                 displayName: true,
+                sections: {
+                    select: {
+                        id: true,
+                        sectionName: true,
+                    },
+                    orderBy: {
+                        sectionName: "asc",
+                    },
+                },
             },
             orderBy: {
                 classNumber: "asc",
@@ -185,7 +194,8 @@ const getPromotionStudents = async (req, res) => {
             where: {
                 schoolId,
                 academicYearId: targetAcademicYearId,
-                isCompleted: false,
+                // isCompleted:
+                //   false,
             },
             select: {
                 id: true,
@@ -235,7 +245,7 @@ const getPromotionStudents = async (req, res) => {
         const result = students.map(student => {
             const pendingAmount = Number(student.pendingAmount ??
                 0);
-            const eligible = pendingAmount === 0;
+            const eligible = true;
             const suggestedClass = getSuggestedClass(student.class.classNumber);
             const existingPromotion = (student
                 .promotionHistory?.[0] ??
@@ -590,6 +600,9 @@ const processStudentPromotion = async (req, res) => {
                 promotion,
                 student: updatedStudent,
             };
+        }, {
+            maxWait: 10000,
+            timeout: 30000,
         });
         /* ========================================================
            RESPONSE
@@ -920,7 +933,7 @@ const processBulkStudentPromotion = async (req, res) => {
                 if (!Number.isFinite(pendingAmount)) {
                     throw new Error(`INVALID_PENDING_AMOUNT:${student.id}`);
                 }
-                if (pendingAmount > 0) {
+                if (pendingAmount > 25000) {
                     throw new Error(`PENDING_FEE:${student.id}`);
                 }
             }
@@ -989,6 +1002,9 @@ const processBulkStudentPromotion = async (req, res) => {
                 });
             }
             return processed;
+        }, {
+            maxWait: 10000,
+            timeout: 30000,
         });
         /* ========================================================
            RESPONSE

@@ -23,13 +23,10 @@ import { handleErr } from "../utils";
    HELPERS
 ============================================================ */
 
-const getSchoolId = (
-  req: any
-): string | undefined => {
-  return (
-    req.user?.schoolId ??
-    req.body?.schoolId
-  );
+
+
+const getSchoolId = (req: any): string | undefined => {
+  return req.user?.schoolId;
 };
 
 const getUserId = (

@@ -12,19 +12,19 @@ export const useClassRoutes = (app: Express) => {
 
   app.get(
     "/api/class/getAll",
-    [authJwt.verifyToken],
+    [authJwt.verifyToken, authJwt.isPrincipalOrAdmin],
     classControllers.getAllClasses
   );
 
   app.post(
     "/api/class/delete",
-    [authJwt.verifyToken, authJwt.isSuperAdmin],
+    [authJwt.verifyToken, authJwt.isSuperAdmin || authJwt.isPrincipalOrAdmin],
     classControllers.deleteClass
   );
 
   app.get(
     "/api/class/get",
-    [authJwt.verifyToken],
+    [authJwt.verifyToken, authJwt.isPrincipalOrAdmin],
     classControllers.getClassDetails
   );
 
@@ -32,7 +32,7 @@ export const useClassRoutes = (app: Express) => {
     "/api/class/edit",
     [
       authJwt.verifyToken,
-      authJwt.isSuperAdmin,
+      authJwt.isSuperAdmin || authJwt.isPrincipalOrAdmin,
       classMiddleWares.checkClassExists,
     ],
     classControllers.editClassDetails
@@ -40,7 +40,7 @@ export const useClassRoutes = (app: Express) => {
 
   app.post(
     "/api/class/markAsCompleted",
-    [authJwt.verifyToken],
+    [authJwt.verifyToken, authJwt.isPrincipalOrAdmin],
     classControllers.markClassAsCompleted
   );
 
@@ -48,7 +48,7 @@ export const useClassRoutes = (app: Express) => {
   app.post(
   "/api/class/copy-to-academic-year",
   authJwt.verifyToken,
-  authJwt.isPrincipal,
+  authJwt.isPrincipalOrAdmin,
   classControllers.copyClassesToAcademicYear
 );
 
@@ -59,7 +59,7 @@ app.post(
 
     authJwt.verifyToken,
 
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
 
     sectionControllers
       .copySectionsToAcademicYear
@@ -69,7 +69,7 @@ app.post(
   app.post(
   "/api/section/create",
   authJwt.verifyToken,
-  authJwt.isPrincipal,
+  authJwt.isPrincipalOrAdmin,
   sectionControllers.createSection
 );
 
@@ -83,6 +83,7 @@ app.post(
     "/api/section/class",
 
     authJwt.verifyToken,
+    authJwt.isPrincipalOrAdmin,
 
     sectionControllers
       .getSectionsByClass
@@ -92,7 +93,7 @@ app.post(
   app.post(
     "/api/section/copy",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     sectionControllers
       .copySectionsToAcademicYear
   );
@@ -118,7 +119,7 @@ app.post(
   app.get(
     "/api/section/available-teachers",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     sectionControllers
       .getAvailableClassTeachers
   );
@@ -131,9 +132,18 @@ app.post(
   app.put(
     "/api/section/class-teacher",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     sectionControllers
       .assignClassTeacher
+  );
+
+
+  app.delete(
+    "/api/section/delete",
+    authJwt.verifyToken,
+    authJwt.isPrincipalOrAdmin,
+    sectionControllers
+      .deleteSection
   );
 
 
@@ -142,9 +152,9 @@ app.post(
   ========================================================== */
 
   app.delete(
-    "/api/section/class-teacher",
+    "/api/section/remove-class-teacher",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     sectionControllers
       .removeClassTeacher
   );

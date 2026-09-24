@@ -11,7 +11,7 @@ const middlewares_1 = require("../middlewares");
  * /attendance/teacher/list?date=27/08/2026
  */
 const useTeacherAttendanceRoutes = (app) => {
-    app.get("/list", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
+    app.get("/api/attendance/teacher/list", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
         .getTeachersForAttendance);
     app.get("/api/attendance/student/my-sections", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getTeacherAssignedSections);
     app.get("/api/teacher-attendance/my-sections", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers.getTeacherAssignedSections);
@@ -22,7 +22,7 @@ const useTeacherAttendanceRoutes = (app) => {
      * POST
      * /attendance/teacher/mark
      */
-    app.post("/mark", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
+    app.post("/api/attendance/teacher/mark", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
         .markTeacherAttendance);
     app.get("/api/attendance/student/my-section-students", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isTeacher, controllers_1.teacherAttendanceControllers
         .getTeacherSectionStudents);
@@ -39,7 +39,7 @@ const useTeacherAttendanceRoutes = (app) => {
      * GET
      * /attendance/teacher/daily?date=27/08/2026
      */
-    app.get("/daily", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
+    app.get("/api/attendance/teacher/daily", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
         .getDailyTeacherAttendance);
 };
 exports.useTeacherAttendanceRoutes = useTeacherAttendanceRoutes;

@@ -31,7 +31,7 @@ const useAttendanceRoutes = (app) => {
         .getTeachersForAttendance);
     app.post("/api/attendance/teacher/mark", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
         .markTeacherAttendance);
-    app.get("/api/attendance/dashboard", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isPrincipal, controllers_1.attendanceDashboardControllers
+    app.get("/api/attendance/dashboard", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isPrincipalOrAdmin, controllers_1.attendanceDashboardControllers
         .getAttendanceDashboard);
     /* ==========================================================
          STUDENT ATTENDANCE HISTORY
@@ -41,7 +41,7 @@ const useAttendanceRoutes = (app) => {
     /* ==========================================================
        CLASS ATTENDANCE REPORT
     ========================================================== */
-    app.get("/api/attendance/report/class", middlewares_1.authJwt.verifyToken, controllers_1.attendanceReportControllers
+    app.get("/api/attendance/report/class", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.attendanceReportControllers
         .getClassAttendanceReport);
     app.get("/api/attendance/teacher/daily", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin || middlewares_1.authJwt.isPrincipal, controllers_1.teacherAttendanceControllers
         .getDailyTeacherAttendance);

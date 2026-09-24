@@ -22,7 +22,7 @@ export const useStudentPromotionRoutes = (
   ---------------------------------------------------------- */
 
   app.get(
-    "/academic-year/promotion/students",
+    "/api/academic-year/promotion/students",
 
     authJwt.verifyToken,
 
@@ -33,7 +33,7 @@ export const useStudentPromotionRoutes = (
   );
 
   app.post(
-  "/academic-year/promotion/student",
+  "/api/academic-year/promotion/student",
   authJwt.verifyToken,
   authJwt.isPrincipal,
   studentPromotionControllers
@@ -41,7 +41,7 @@ export const useStudentPromotionRoutes = (
 );
 
 app.post(
-  "/academic-year/promotion/students/bulk",
+  "/api/academic-year/promotion/students/bulk",
   authJwt.verifyToken,
   authJwt.isPrincipal,
   studentPromotionControllers

@@ -7,12 +7,14 @@ const {
   verifyToken,
   isPrincipal,
   isAdmin,
+  isPrincipalOrAdmin,
 } = authJwt;
 
 const {
   getTeachers,
   getParents,
   getAdmins,
+  getMyProfile,
 } = principalController;
 
 export const usePrincipalRoutes = (
@@ -22,7 +24,7 @@ export const usePrincipalRoutes = (
     "/api/principal/teachers",
     [
       verifyToken,
-      isPrincipal,
+      isPrincipalOrAdmin,
     ],
     getTeachers
   );
@@ -31,7 +33,7 @@ export const usePrincipalRoutes = (
     "/api/principal/parents",
     [
       verifyToken,
-      isPrincipal,
+      isPrincipalOrAdmin,
     ],
     getParents
   );
@@ -40,7 +42,7 @@ export const usePrincipalRoutes = (
     "/api/principal/parents/:parentId",
     [
       verifyToken,
-      isPrincipal,
+      isPrincipalOrAdmin,
     ],
     getParents
   );
@@ -53,4 +55,18 @@ export const usePrincipalRoutes = (
     ],
     getAdmins
   );
+
+  app.get(
+    "/api/principal/admins/:adminId",
+    [
+      verifyToken,
+      isPrincipal,
+    ],
+    getAdmins
+  );
+
+  app.get('/api/principal/profile', [
+    verifyToken,
+    isPrincipal,
+  ], principalController.getMyProfile);
 };

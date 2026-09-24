@@ -36,3 +36,5 @@ __exportStar(require("./teacherMarks.routes"), exports);
 __exportStar(require("./teacherLeave.routes"), exports);
 __exportStar(require("./teacherProfile.routes"), exports);
 __exportStar(require("./teacherTimetable.routes"), exports);
+__exportStar(require("./adminDashboard.routes"), exports);
+__exportStar(require("./adminAttendanceLeave.routes"), exports);

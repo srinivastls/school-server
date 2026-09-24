@@ -8,4 +8,10 @@ export const useUserRoutes = (app: Express) => {
     [authJwt.verifyToken, authJwt.isSuperAdmin],
     userController.getAllUsers
   );
+
+  app.get(
+    "/api/users/profile",
+    [authJwt.verifyToken],
+    userController.getProfile
+  );
 };

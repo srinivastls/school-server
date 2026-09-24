@@ -321,6 +321,18 @@ const isPrincipal = async (
   }
 };
 
+const isPrincipalOrAdmin = (req: any, res: any, next: any) => {
+  const role = req.user?.role;
+
+  if (role !== "PRINCIPAL" && role !== "ADMIN") {
+    return res.status(403).json({
+      message: "Access denied. Principal or Admin role required.",
+    });
+  }
+
+  next();
+};
+
 /* ============================================================
    OWNER
 ============================================================ */
@@ -517,6 +529,7 @@ export const authJwt = {
   isAdmin,
   isTeacher,
   isParent,
+  isPrincipalOrAdmin,
 
   /* Compatibility */
   isOwner,

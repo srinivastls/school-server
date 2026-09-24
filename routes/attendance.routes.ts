@@ -133,7 +133,7 @@ export const useAttendanceRoutes = (
   "/api/attendance/dashboard",
 
   authJwt.verifyToken,
-  authJwt.isPrincipal,
+  authJwt.isPrincipalOrAdmin,
 
   attendanceDashboardControllers
     .getAttendanceDashboard
@@ -161,6 +161,7 @@ export const useAttendanceRoutes = (
     "/api/attendance/report/class",
 
     authJwt.verifyToken,
+    authJwt.isAdmin || authJwt.isPrincipal,
 
     attendanceReportControllers
       .getClassAttendanceReport

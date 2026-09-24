@@ -21,3 +21,6 @@ export * from "./teacherMarks.controllers";
 export * from "./teacherLeave.controllers";
 export * from "./teacherProfile.controllers";
 export * from "./teacherTimetable.controllers";
+export * from "./adminDashboard.controller";
+export * from "./adminTeacherAttendance.controller";
+export * from "./adminLeave.controller";

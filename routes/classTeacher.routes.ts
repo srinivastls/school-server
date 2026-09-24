@@ -8,24 +8,27 @@ export const useClassTeacherRoutes = (
   app.get(
     "/api/class-teacher",
     authJwt.verifyToken,
+    authJwt.isPrincipalOrAdmin,
     classTeacherControllers.getClassTeacherAssignments
   );
 
   app.get(
     "/api/class-teacher/available",
     authJwt.verifyToken,
+    authJwt.isPrincipalOrAdmin,
     classTeacherControllers.getAvailableClassTeachers
   );
   app.get(
     "/api/class-teacher/class/:classId",
     authJwt.verifyToken,
+    authJwt.isPrincipalOrAdmin,
     classTeacherControllers.getClassTeacherAssignments
   );
 
   app.post(
     "/api/class-teacher/assign",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     classTeacherControllers.assignClassTeacher
   );
 };

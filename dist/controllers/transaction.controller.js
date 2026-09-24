@@ -9,8 +9,7 @@ const utils_1 = require("../utils");
    HELPERS
 ============================================================ */
 const getSchoolId = (req) => {
-    return (req.user?.schoolId ??
-        req.body?.schoolId);
+    return req.user?.schoolId;
 };
 const getUserId = (req) => {
     return req.user?.id;

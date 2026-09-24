@@ -37,3 +37,6 @@ __exportStar(require("./teacherMarks.controllers"), exports);
 __exportStar(require("./teacherLeave.controllers"), exports);
 __exportStar(require("./teacherProfile.controllers"), exports);
 __exportStar(require("./teacherTimetable.controllers"), exports);
+__exportStar(require("./adminDashboard.controller"), exports);
+__exportStar(require("./adminTeacherAttendance.controller"), exports);
+__exportStar(require("./adminLeave.controller"), exports);

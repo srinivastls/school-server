@@ -100,14 +100,21 @@ const createClass = async (req, res) => {
 const getAllClasses = async (req, res) => {
     try {
         const schoolId = getSchoolId(req);
+        const academicYearId = req.query?.academicYearId;
         if (!schoolId) {
             return res.status(400).json({
                 message: "schoolId is required",
             });
         }
+        if (!academicYearId) {
+            return res.status(400).json({
+                message: "academicYearId is required",
+            });
+        }
         const classes = await config_1.prisma.class.findMany({
             where: {
                 schoolId,
+                academicYearId,
                 isCompleted: false,
             },
             include: {

@@ -53,6 +53,8 @@ app.get("/", (req, res) => {
 (0, routes_1.useTeacherMarksRoutes)(app);
 (0, routes_1.useTeacherProfileRoutes)(app);
 (0, routes_1.useTeacherTimetableRoutes)(app);
+(0, routes_1.useAdminDashboardRoutes)(app);
+(0, routes_1.useAdminAttendanceLeaveRoutes)(app);
 /* ============================================================
    SERVER
 ============================================================ */

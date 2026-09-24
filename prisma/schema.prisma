@@ -8,15 +8,6 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-enum EnrollmentStatus {
-  ACTIVE
-  PROMOTED
-  DEMOTED
-  RETAINED
-  TRANSFERRED
-  LEFT
-}
-
 model PlatformAdmin {
   id             String                @id @default(uuid())
   name           String
@@ -58,6 +49,7 @@ model School {
   createdAt                  DateTime                    @default(now()) @map("created_at")
   updatedAt                  DateTime                    @default(now()) @map("updated_at")
   code                       String                      @unique @db.VarChar(50)
+  StudentAcademicEnrollments StudentAcademicEnrollment[]
   academicYears              AcademicYear[]
   announcements              Announcement[]
   attendances                Attendance[]
@@ -75,6 +67,7 @@ model School {
   onboardingLogs             SchoolOnboardingLog[]
   createdByPlatformAdmin     PlatformAdmin?              @relation("SchoolCreatedBy", fields: [createdByPlatformAdminId], references: [id])
   sections                   Section[]
+  studentPromotions          StudentPromotion[]
   students                   Student[]
   subjects                   Subject[]
   teacherAttendances         TeacherAttendance[]
@@ -83,38 +76,28 @@ model School {
   transactions               Transaction[]
   transferCertificates       TransferCertificate[]
   users                      User[]
-  StudentAcademicEnrollments StudentAcademicEnrollment[]
-  studentPromotions          StudentPromotion[]
 
   @@map("schools")
 }
 
 model AcademicYear {
-  id String @id @default(uuid())
-
-  schoolId String @map("school_id") @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  name      String
-  startDate DateTime @map("start_date")
-  endDate   DateTime @map("end_date")
-  isCurrent Boolean  @default(false) @map("is_current")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  classes         Class[]
-  exams           Exam[]
-  teacherMappings TeacherSubjectMapping[]
-  idCards         IDCard[]
-
-  attendances Attendance[]
-
+  id                         String                      @id @default(uuid())
+  schoolId                   String                      @map("school_id") @db.Uuid
+  name                       String
+  startDate                  DateTime                    @map("start_date")
+  endDate                    DateTime                    @map("end_date")
+  isCurrent                  Boolean                     @default(false) @map("is_current")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
   StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionsFrom StudentPromotion[] @relation("StudentPromotionFromYear")
-
-  promotionsTo StudentPromotion[] @relation("StudentPromotionToYear")
+  school                     School                      @relation(fields: [schoolId], references: [id])
+  attendances                Attendance[]
+  classes                    Class[]
+  exams                      Exam[]
+  idCards                    IDCard[]
+  promotionsFrom             StudentPromotion[]          @relation("StudentPromotionFromYear")
+  promotionsTo               StudentPromotion[]          @relation("StudentPromotionToYear")
+  teacherMappings            TeacherSubjectMapping[]
 
   @@unique([schoolId, name])
   @@index([schoolId, isCurrent])
@@ -139,8 +122,8 @@ model User {
   createdAt                DateTime                @default(now()) @map("created_at")
   updatedAt                DateTime                @updatedAt @map("updated_at")
   announcements            Announcement[]
-  auditLogs                AuditLog[]
   attendanceMarkedByUser   Attendance[]            @relation("AttendanceMarkedBy")
+  auditLogs                AuditLog[]
   assignedComplaints       Complaint[]             @relation("ComplaintAssignedTo")
   submittedComplaints      Complaint[]             @relation("ComplaintSubmittedBy")
   couponsApproved          Coupon[]                @relation("CouponApprovedBy")
@@ -154,12 +137,12 @@ model User {
   notifications            Notification[]
   classTeacherSections     Section[]               @relation("ClassTeacher")
   parentLinks              StudentParentLink[]
+  studentPromotions        StudentPromotion[]      @relation("StudentPromotedBy")
   createdStudents          Student[]               @relation("StudentCreatedBy")
   teacherMarkedAttendances TeacherAttendance[]     @relation("TeacherAttendanceMarkedBy")
   teacherAttendances       TeacherAttendance[]
   teacherMappings          TeacherSubjectMapping[]
   timetables               Timetable[]
-  studentPromotions        StudentPromotion[]      @relation("StudentPromotedBy")
   transactions             Transaction[]           @relation("TransactionRecordedBy")
   issuedTCs                TransferCertificate[]   @relation("TCIssuedBy")
   school                   School                  @relation(fields: [schoolId], references: [id])
@@ -183,21 +166,19 @@ model Class {
   isCompleted                Boolean                     @default(false) @map("is_completed")
   createdAt                  DateTime                    @default(now()) @map("created_at")
   updatedAt                  DateTime                    @updatedAt @map("updated_at")
+  StudentAcademicEnrollments StudentAcademicEnrollment[]
+  attendances                Attendance[]
   academicYear               AcademicYear                @relation(fields: [academicYearId], references: [id])
   school                     School                      @relation(fields: [schoolId], references: [id])
   coupons                    Coupon[]
   examSubjects               ExamSubject[]
   examTimetables             ExamTimetable[]
   sections                   Section[]
+  promotionsFrom             StudentPromotion[]          @relation("StudentPromotionFromClass")
+  promotionsTo               StudentPromotion[]          @relation("StudentPromotionToClass")
   students                   Student[]
   subjects                   Subject[]
   timetables                 Timetable[]
-  attendances                Attendance[]
-  StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionsFrom StudentPromotion[] @relation("StudentPromotionFromClass")
-
-  promotionsTo StudentPromotion[] @relation("StudentPromotionToClass")
 
   @@unique([schoolId, academicYearId, classNumber])
   @@index([schoolId])
@@ -205,30 +186,22 @@ model Class {
 }
 
 model StudentAcademicEnrollment {
-  id String @id @default(uuid())
-
-  schoolId String @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  academicYearId String
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-
-  studentId String
-  student   Student @relation(fields: [studentId], references: [id])
-
-  classId String
-  class   Class  @relation(fields: [classId], references: [id])
-
-  sectionId String
-  section   Section @relation(fields: [sectionId], references: [id])
-
-  enrollmentStatus EnrollmentStatus
-
+  id                    String           @id @default(uuid())
+  schoolId              String           @db.Uuid
+  academicYearId        String
+  studentId             String
+  classId               String
+  sectionId             String
+  enrollmentStatus      EnrollmentStatus
   promotedFromClassId   String?
   promotedFromSectionId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  academicYear          AcademicYear     @relation(fields: [academicYearId], references: [id])
+  class                 Class            @relation(fields: [classId], references: [id])
+  school                School           @relation(fields: [schoolId], references: [id])
+  section               Section          @relation(fields: [sectionId], references: [id])
+  student               Student          @relation(fields: [studentId], references: [id])
 
   @@unique([schoolId, academicYearId, studentId])
   @@index([schoolId, academicYearId, classId])
@@ -236,26 +209,23 @@ model StudentAcademicEnrollment {
 }
 
 model Section {
-  id              String                  @id @default(uuid())
-  schoolId        String                  @map("school_id") @db.Uuid
-  classId         String                  @map("class_id")
-  sectionName     String                  @map("section_name")
-  classTeacherId  String?                 @map("class_teacher_id")
-  createdAt       DateTime                @default(now()) @map("created_at")
-  updatedAt       DateTime                @updatedAt @map("updated_at")
-  class           Class                   @relation(fields: [classId], references: [id])
-  classTeacher    User?                   @relation("ClassTeacher", fields: [classTeacherId], references: [id])
-  school          School                  @relation(fields: [schoolId], references: [id])
-  students        Student[]
-  teacherMappings TeacherSubjectMapping[]
-  timetables      Timetable[]
-  attendances     Attendance[]
-
+  id                         String                      @id @default(uuid())
+  schoolId                   String                      @map("school_id") @db.Uuid
+  classId                    String                      @map("class_id")
+  sectionName                String                      @map("section_name")
+  classTeacherId             String?                     @map("class_teacher_id")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
   StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionsFrom StudentPromotion[] @relation("StudentPromotionFromSection")
-
-  promotionsTo StudentPromotion[] @relation("StudentPromotionToSection")
+  attendances                Attendance[]
+  class                      Class                       @relation(fields: [classId], references: [id])
+  classTeacher               User?                       @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  school                     School                      @relation(fields: [schoolId], references: [id])
+  promotionsFrom             StudentPromotion[]          @relation("StudentPromotionFromSection")
+  promotionsTo               StudentPromotion[]          @relation("StudentPromotionToSection")
+  students                   Student[]
+  teacherMappings            TeacherSubjectMapping[]
+  timetables                 Timetable[]
 
   @@unique([schoolId, classId, sectionName])
   @@index([schoolId])
@@ -303,59 +273,57 @@ model TeacherSubjectMapping {
 }
 
 model Student {
-  id                   String                @id @default(uuid())
-  schoolId             String                @map("school_id") @db.Uuid
-  classId              String                @map("class_id")
-  sectionId            String                @map("section_id")
-  admissionNo          String                @map("admission_no")
-  name                 String
-  fatherName           String                @map("father_name")
-  motherName           String?               @map("mother_name")
-  dob                  String
-  doj                  String
-  gender               String?
-  bloodGroup           String?               @map("blood_group")
-  aadhaar              String?
-  category             String?
-  religion             String?
-  phone                String?
-  emergencyContact     String?               @map("emergency_contact")
-  photoUrl             String?               @map("photo_url")
-  previousSchool       String?               @map("previous_school")
-  rollNumber           String?               @map("roll_number")
-  status               StudentStatus         @default(ACTIVE)
-  couponId             String?               @map("coupon_id")
-  tieAmount            String                @map("tie_amount")
-  tiePendingAmount     String                @map("tie_pending_amount")
-  beltAmount           String                @map("belt_amount")
-  beltPendingAmount    String                @map("belt_pending_amount")
-  arrearsAmount        String                @map("arrears_amount")
-  arrearsPendingAmount String                @map("arrears_pending_amount")
-  pendingTuitionFee    String                @map("pending_tuition_fee")
-  pendingTextbookFee   String                @map("pending_textbook_fee")
-  pendingNotebookFee   String                @map("pending_notebook_fee")
-  pendingDiaryAmount   String                @map("pending_diary_amount")
-  pendingAmount        String                @map("pending_amount")
-  siblings             Json
-  createdByAdminId     String?               @map("created_by_admin_id")
-  createdAt            DateTime              @default(now()) @map("created_at")
-  updatedAt            DateTime              @default(now()) @map("updated_at")
-  attendances          Attendance[]
-  complaints           Complaint[]
-  idCards              IDCard[]
-  marks                Mark[]
-  parentLinks          StudentParentLink[]
-  class                Class                 @relation(fields: [classId], references: [id])
-  coupon               Coupon?               @relation(fields: [couponId], references: [id])
-  createdByAdmin       User?                 @relation("StudentCreatedBy", fields: [createdByAdminId], references: [id])
-  school               School                @relation(fields: [schoolId], references: [id])
-  section              Section               @relation(fields: [sectionId], references: [id])
-  transactions         Transaction[]
-  transferCertificates TransferCertificate[]
-
+  id                         String                      @id @default(uuid())
+  schoolId                   String                      @map("school_id") @db.Uuid
+  classId                    String                      @map("class_id")
+  sectionId                  String                      @map("section_id")
+  admissionNo                String                      @map("admission_no")
+  name                       String
+  fatherName                 String                      @map("father_name")
+  motherName                 String?                     @map("mother_name")
+  dob                        String
+  doj                        String
+  gender                     String?
+  bloodGroup                 String?                     @map("blood_group")
+  aadhaar                    String?
+  category                   String?
+  religion                   String?
+  phone                      String?
+  emergencyContact           String?                     @map("emergency_contact")
+  photoUrl                   String?                     @map("photo_url")
+  previousSchool             String?                     @map("previous_school")
+  rollNumber                 String?                     @map("roll_number")
+  status                     StudentStatus               @default(ACTIVE)
+  couponId                   String?                     @map("coupon_id")
+  tieAmount                  String                      @map("tie_amount")
+  tiePendingAmount           String                      @map("tie_pending_amount")
+  beltAmount                 String                      @map("belt_amount")
+  beltPendingAmount          String                      @map("belt_pending_amount")
+  arrearsAmount              String                      @map("arrears_amount")
+  arrearsPendingAmount       String                      @map("arrears_pending_amount")
+  pendingTuitionFee          String                      @map("pending_tuition_fee")
+  pendingTextbookFee         String                      @map("pending_textbook_fee")
+  pendingNotebookFee         String                      @map("pending_notebook_fee")
+  pendingDiaryAmount         String                      @map("pending_diary_amount")
+  pendingAmount              String                      @map("pending_amount")
+  siblings                   Json
+  createdByAdminId           String?                     @map("created_by_admin_id")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @default(now()) @map("updated_at")
   StudentAcademicEnrollments StudentAcademicEnrollment[]
-
-  promotionHistory StudentPromotion[]
+  attendances                Attendance[]
+  complaints                 Complaint[]
+  idCards                    IDCard[]
+  marks                      Mark[]
+  parentLinks                StudentParentLink[]
+  promotionHistory           StudentPromotion[]
+  class                      Class                       @relation(fields: [classId], references: [id])
+  coupon                     Coupon?                     @relation(fields: [couponId], references: [id])
+  createdByAdmin             User?                       @relation("StudentCreatedBy", fields: [createdByAdminId], references: [id])
+  school                     School                      @relation(fields: [schoolId], references: [id])
+  section                    Section                     @relation(fields: [sectionId], references: [id])
+  transactions               Transaction[]
+  transferCertificates       TransferCertificate[]
 
   @@unique([schoolId, admissionNo])
   @@index([schoolId])
@@ -433,34 +401,24 @@ model Transaction {
 }
 
 model Attendance {
-  id String @id @default(uuid())
-
-  schoolId String @map("school_id") @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  studentId String  @map("student_id")
-  student   Student @relation(fields: [studentId], references: [id])
-
-  classId String @map("class_id")
-  class   Class  @relation(fields: [classId], references: [id])
-
-  sectionId String  @map("section_id")
-  section   Section @relation(fields: [sectionId], references: [id])
-
-  academicYearId String       @map("academic_year_id")
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-
-  date DateTime @db.Date
-
-  status AttendanceStatus
-
-  markedByUserId String @map("marked_by_user_id")
-  markedByUser   User   @relation("AttendanceMarkedBy", fields: [markedByUserId], references: [id])
-
-  remark String?
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String           @id @default(uuid())
+  schoolId       String           @map("school_id") @db.Uuid
+  date           DateTime         @db.Date
+  status         AttendanceStatus
+  remark         String?
+  academicYearId String           @map("academic_year_id")
+  classId        String           @map("class_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  markedByUserId String           @map("marked_by_user_id")
+  sectionId      String           @map("section_id")
+  studentId      String           @map("student_id")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  academicYear   AcademicYear     @relation(fields: [academicYearId], references: [id])
+  class          Class            @relation(fields: [classId], references: [id])
+  markedByUser   User             @relation("AttendanceMarkedBy", fields: [markedByUserId], references: [id])
+  school         School           @relation(fields: [schoolId], references: [id])
+  section        Section          @relation(fields: [sectionId], references: [id])
+  student        Student          @relation(fields: [studentId], references: [id])
 
   @@unique([schoolId, studentId, date])
   @@index([schoolId, date])
@@ -793,53 +751,30 @@ model SchoolOnboardingLog {
   @@map("school_onboarding_logs")
 }
 
-// ============================================================
-// STUDENT PROMOTION / ACADEMIC HISTORY
-// ============================================================
-
-enum PromotionStatus {
-  PROMOTED
-  DEMOTED
-  REPEATED
-  NOT_PROMOTED
-}
-
 model StudentPromotion {
-  id String @id @default(uuid())
-
-  schoolId String @map("school_id") @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id])
-
-  studentId String  @map("student_id")
-  student   Student @relation(fields: [studentId], references: [id])
-
-  fromAcademicYearId String       @map("from_academic_year_id")
-  fromAcademicYear   AcademicYear @relation("StudentPromotionFromYear", fields: [fromAcademicYearId], references: [id])
-
-  toAcademicYearId String?       @map("to_academic_year_id")
-  toAcademicYear   AcademicYear? @relation("StudentPromotionToYear", fields: [toAcademicYearId], references: [id])
-
-  fromClassId String @map("from_class_id")
-  fromClass   Class  @relation("StudentPromotionFromClass", fields: [fromClassId], references: [id])
-
-  fromSectionId String?  @map("from_section_id")
-  fromSection   Section? @relation("StudentPromotionFromSection", fields: [fromSectionId], references: [id])
-
-  toClassId String? @map("to_class_id")
-  toClass   Class?  @relation("StudentPromotionToClass", fields: [toClassId], references: [id])
-
-  toSectionId String?  @map("to_section_id")
-  toSection   Section? @relation("StudentPromotionToSection", fields: [toSectionId], references: [id])
-
-  status PromotionStatus
-
-  remark String?
-
-  promotedByUserId String @map("promoted_by_user_id")
-  promotedByUser   User   @relation("StudentPromotedBy", fields: [promotedByUserId], references: [id])
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                 String          @id @default(uuid())
+  schoolId           String          @map("school_id") @db.Uuid
+  studentId          String          @map("student_id")
+  fromAcademicYearId String          @map("from_academic_year_id")
+  toAcademicYearId   String?         @map("to_academic_year_id")
+  fromClassId        String          @map("from_class_id")
+  fromSectionId      String?         @map("from_section_id")
+  toClassId          String?         @map("to_class_id")
+  toSectionId        String?         @map("to_section_id")
+  status             PromotionStatus
+  remark             String?
+  promotedByUserId   String          @map("promoted_by_user_id")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  fromAcademicYear   AcademicYear    @relation("StudentPromotionFromYear", fields: [fromAcademicYearId], references: [id])
+  fromClass          Class           @relation("StudentPromotionFromClass", fields: [fromClassId], references: [id])
+  fromSection        Section?        @relation("StudentPromotionFromSection", fields: [fromSectionId], references: [id])
+  promotedByUser     User            @relation("StudentPromotedBy", fields: [promotedByUserId], references: [id])
+  school             School          @relation(fields: [schoolId], references: [id])
+  student            Student         @relation(fields: [studentId], references: [id])
+  toAcademicYear     AcademicYear?   @relation("StudentPromotionToYear", fields: [toAcademicYearId], references: [id])
+  toClass            Class?          @relation("StudentPromotionToClass", fields: [toClassId], references: [id])
+  toSection          Section?        @relation("StudentPromotionToSection", fields: [toSectionId], references: [id])
 
   @@unique([schoolId, studentId, fromAcademicYearId, toAcademicYearId])
   @@index([schoolId])
@@ -848,8 +783,6 @@ model StudentPromotion {
   @@index([schoolId, toAcademicYearId])
   @@map("student_promotions")
 }
-
-
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model prisma_migrations_backup_20260827 {
@@ -864,6 +797,22 @@ model prisma_migrations_backup_20260827 {
 
   @@map("_prisma_migrations_backup_20260827")
   @@ignore
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  DEMOTED
+  RETAINED
+  TRANSFERRED
+  LEFT
+}
+
+enum PromotionStatus {
+  PROMOTED
+  DEMOTED
+  REPEATED
+  NOT_PROMOTED
 }
 
 enum RoleName {
