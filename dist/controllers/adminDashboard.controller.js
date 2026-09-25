@@ -96,7 +96,7 @@ const getAdminDashboard = async (req, res) => {
         const weekStart = startOfWeek(now);
         const monthStart = startOfMonth(now);
         /**
-         * Execute independent database queries in parallel.
+         * Get current academic year.
          */
         const currentAcademicYear = await config_1.prisma.academicYear.findFirst({
             where: {
@@ -110,108 +110,106 @@ const getAdminDashboard = async (req, res) => {
                 endDate: true,
             },
         });
-        const [todayTransactions, weekTransactions, monthTransactions, totalStudents, totalTeachers, teacherAttendance, pendingLeaveApprovals,] = await Promise.all([
-            /**
-             * Today's transactions
-             */
-            config_1.prisma.transaction.findMany({
+        /**
+         * Today's transactions.
+         */
+        const todayTransactions = await config_1.prisma.transaction.findMany({
+            where: {
+                schoolId,
+                createdAt: {
+                    gte: todayStart,
+                    lt: tomorrowStart,
+                },
+            },
+            select: {
+                amount: true,
+            },
+        });
+        /**
+         * Current week's transactions.
+         */
+        const weekTransactions = await config_1.prisma.transaction.findMany({
+            where: {
+                schoolId,
+                createdAt: {
+                    gte: weekStart,
+                    lt: tomorrowStart,
+                },
+            },
+            select: {
+                amount: true,
+            },
+        });
+        /**
+         * Current month's transactions.
+         */
+        const monthTransactions = await config_1.prisma.transaction.findMany({
+            where: {
+                schoolId,
+                createdAt: {
+                    gte: monthStart,
+                    lt: tomorrowStart,
+                },
+            },
+            select: {
+                amount: true,
+            },
+        });
+        /**
+         * Students enrolled in the current academic year.
+         *
+         * We use enrollment records instead of counting the
+         * Student table directly.
+         */
+        const totalStudents = currentAcademicYear
+            ? await config_1.prisma.studentAcademicEnrollment.count({
                 where: {
                     schoolId,
-                    createdAt: {
-                        gte: todayStart,
-                        lt: tomorrowStart,
+                    academicYearId: currentAcademicYear.id,
+                    enrollmentStatus: {
+                        not: "LEFT",
                     },
                 },
-                select: {
-                    amount: true,
-                },
-            }),
-            /**
-             * Current week's transactions
-             */
-            config_1.prisma.transaction.findMany({
+            })
+            : await config_1.prisma.student.count({
                 where: {
                     schoolId,
-                    createdAt: {
-                        gte: weekStart,
-                        lt: tomorrowStart,
-                    },
                 },
-                select: {
-                    amount: true,
+            });
+        /**
+         * Active teachers.
+         */
+        const totalTeachers = await config_1.prisma.user.count({
+            where: {
+                schoolId,
+                role: "TEACHER",
+                isActive: true,
+            },
+        });
+        /**
+         * Today's teacher attendance.
+         */
+        const teacherAttendance = await config_1.prisma.teacherAttendance.findMany({
+            where: {
+                schoolId,
+                date: {
+                    gte: todayStart,
+                    lt: tomorrowStart,
                 },
-            }),
-            /**
-             * Current month's transactions
-             */
-            config_1.prisma.transaction.findMany({
-                where: {
-                    schoolId,
-                    createdAt: {
-                        gte: monthStart,
-                        lt: tomorrowStart,
-                    },
-                },
-                select: {
-                    amount: true,
-                },
-            }),
-            /**
-             * Students enrolled in the current academic year.
-             *
-             * We use enrollment records instead of counting the
-             * Student table directly.
-             */
-            currentAcademicYear
-                ? config_1.prisma.studentAcademicEnrollment.count({
-                    where: {
-                        schoolId,
-                        academicYearId: currentAcademicYear.id,
-                        enrollmentStatus: {
-                            not: "LEFT",
-                        },
-                    },
-                })
-                : config_1.prisma.student.count({
-                    where: {
-                        schoolId,
-                    },
-                }),
-            /**
-             * Active teachers
-             */
-            config_1.prisma.user.count({
-                where: {
-                    schoolId,
-                    role: "TEACHER",
-                    isActive: true,
-                },
-            }),
-            /**
-             * Today's teacher attendance
-             */
-            config_1.prisma.teacherAttendance.findMany({
-                where: {
-                    schoolId,
-                    date: {
-                        gte: todayStart,
-                        lt: tomorrowStart,
-                    },
-                },
-                select: {
-                    status: true,
-                },
-            }),
-            /**
-             * Pending teacher leave approvals
-             */
-            config_1.prisma.leaveRequest.count({
-                where: {
-                    schoolId,
-                    status: "PENDING",
-                },
-            }),
-        ]);
+            },
+            select: {
+                status: true,
+            },
+        });
+        /**
+         * Pending teacher leave approvals.
+         */
+        const pendingLeaveApprovals = await config_1.prisma.leaveRequest.count({
+            where: {
+                schoolId,
+                status: "PENDING",
+            },
+        });
         /**
          * Calculate collection values.
          */

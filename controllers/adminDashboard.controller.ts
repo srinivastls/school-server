@@ -1,3 +1,4 @@
+
 import { Request, Response } from "../types";
 import { prisma } from "../config";
 import { handleErr } from "../utils";
@@ -120,13 +121,11 @@ export const getAdminDashboard = async (
 
     const todayStart = startOfDay(now);
     const tomorrowStart = startOfNextDay(now);
-
     const weekStart = startOfWeek(now);
-
     const monthStart = startOfMonth(now);
 
     /**
-     * Execute independent database queries in parallel.
+     * Get current academic year.
      */
     const currentAcademicYear = await prisma.academicYear.findFirst({
       where: {
@@ -141,100 +140,92 @@ export const getAdminDashboard = async (
       },
     });
 
-    const [
-      todayTransactions,
-      weekTransactions,
-      monthTransactions,
-      totalStudents,
-      totalTeachers,
-      teacherAttendance,
-      pendingLeaveApprovals,
-    ] = await Promise.all([
-      /**
-       * Today's transactions
-       */
-      prisma.transaction.findMany({
-        where: {
-          schoolId,
-          createdAt: {
-            gte: todayStart,
-            lt: tomorrowStart,
-          },
+    /**
+     * Today's transactions.
+     */
+    const todayTransactions = await prisma.transaction.findMany({
+      where: {
+        schoolId,
+        createdAt: {
+          gte: todayStart,
+          lt: tomorrowStart,
         },
-        select: {
-          amount: true,
-        },
-      }),
+      },
+      select: {
+        amount: true,
+      },
+    });
 
-      /**
-       * Current week's transactions
-       */
-      prisma.transaction.findMany({
-        where: {
-          schoolId,
-          createdAt: {
-            gte: weekStart,
-            lt: tomorrowStart,
-          },
+    /**
+     * Current week's transactions.
+     */
+    const weekTransactions = await prisma.transaction.findMany({
+      where: {
+        schoolId,
+        createdAt: {
+          gte: weekStart,
+          lt: tomorrowStart,
         },
-        select: {
-          amount: true,
-        },
-      }),
+      },
+      select: {
+        amount: true,
+      },
+    });
 
-      /**
-       * Current month's transactions
-       */
-      prisma.transaction.findMany({
-        where: {
-          schoolId,
-          createdAt: {
-            gte: monthStart,
-            lt: tomorrowStart,
-          },
+    /**
+     * Current month's transactions.
+     */
+    const monthTransactions = await prisma.transaction.findMany({
+      where: {
+        schoolId,
+        createdAt: {
+          gte: monthStart,
+          lt: tomorrowStart,
         },
-        select: {
-          amount: true,
-        },
-      }),
+      },
+      select: {
+        amount: true,
+      },
+    });
 
-      /**
-       * Students enrolled in the current academic year.
-       *
-       * We use enrollment records instead of counting the
-       * Student table directly.
-       */
-      currentAcademicYear
-        ? prisma.studentAcademicEnrollment.count({
-            where: {
-              schoolId,
-              academicYearId: currentAcademicYear.id,
-              enrollmentStatus: {
-                not: "LEFT",
-              },
+    /**
+     * Students enrolled in the current academic year.
+     *
+     * We use enrollment records instead of counting the
+     * Student table directly.
+     */
+    const totalStudents = currentAcademicYear
+      ? await prisma.studentAcademicEnrollment.count({
+          where: {
+            schoolId,
+            academicYearId: currentAcademicYear.id,
+            enrollmentStatus: {
+              not: "LEFT",
             },
-          })
-        : prisma.student.count({
-            where: {
-              schoolId,
-            },
-          }),
+          },
+        })
+      : await prisma.student.count({
+          where: {
+            schoolId,
+          },
+        });
 
-      /**
-       * Active teachers
-       */
-      prisma.user.count({
-        where: {
-          schoolId,
-          role: "TEACHER",
-          isActive: true,
-        },
-      }),
+    /**
+     * Active teachers.
+     */
+    const totalTeachers = await prisma.user.count({
+      where: {
+        schoolId,
+        role: "TEACHER",
+        isActive: true,
+      },
+    });
 
-      /**
-       * Today's teacher attendance
-       */
-      prisma.teacherAttendance.findMany({
+    /**
+     * Today's teacher attendance.
+     */
+    const teacherAttendance =
+      await prisma.teacherAttendance.findMany({
         where: {
           schoolId,
           date: {
@@ -245,18 +236,18 @@ export const getAdminDashboard = async (
         select: {
           status: true,
         },
-      }),
+      });
 
-      /**
-       * Pending teacher leave approvals
-       */
-      prisma.leaveRequest.count({
+    /**
+     * Pending teacher leave approvals.
+     */
+    const pendingLeaveApprovals =
+      await prisma.leaveRequest.count({
         where: {
           schoolId,
           status: "PENDING",
         },
-      }),
-    ]);
+      });
 
     /**
      * Calculate collection values.
@@ -306,7 +297,6 @@ export const getAdminDashboard = async (
           todayCollection,
           weeklyCollection,
           monthlyCollection,
-
           pendingFees: null,
           defaultersCount: null,
         },

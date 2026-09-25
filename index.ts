@@ -1,5 +1,4 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 
 import { prisma } from "./config";
@@ -26,12 +25,13 @@ import {
   useTeacherProfileRoutes,
   useTeacherTimetableRoutes,
   useAdminDashboardRoutes,
-  useAdminAttendanceLeaveRoutes
+  useAdminAttendanceLeaveRoutes,
+  useBulkImportSessionRoutes
   
 
 } from "./routes";
+import { useBulkImportRoutes } from "./routes/bulkImport.routes";
 
-dotenv.config();
 
 const app = express();
 
@@ -117,6 +117,8 @@ useTeacherProfileRoutes(app);
 useTeacherTimetableRoutes(app);
 useAdminDashboardRoutes(app);
 useAdminAttendanceLeaveRoutes(app);
+useBulkImportRoutes(app);
+useBulkImportSessionRoutes(app);
 /* ============================================================
    SERVER
 ============================================================ */
@@ -141,6 +143,10 @@ const bootstrap = async () => {
     console.log(
       "connected to postgres sql"
     );
+
+    await prisma.$queryRaw`SELECT 1`;
+
+    console.log("Prisma connected and query succeeded");
 
     /* --------------------------------------------------------
        START SERVER

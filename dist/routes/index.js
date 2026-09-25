@@ -38,3 +38,4 @@ __exportStar(require("./teacherProfile.routes"), exports);
 __exportStar(require("./teacherTimetable.routes"), exports);
 __exportStar(require("./adminDashboard.routes"), exports);
 __exportStar(require("./adminAttendanceLeave.routes"), exports);
+__exportStar(require("./bulkImportSession.routes"), exports);

@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model PlatformAdmin {
@@ -1008,4 +1007,44 @@ enum AuditAction {
   REVOKE
   GENERATE
   REGENERATE
+}
+
+enum BulkImportStatus {
+  UPLOADED
+  VALIDATING
+  READY
+  COMMITTED
+  FAILED
+  EXPIRED
+}
+
+model BulkImportSession {
+  id               String           @id @default(uuid())
+  schoolId         String           @map("school_id") @db.Uuid
+  createdByUserId  String           @map("created_by_user_id")
+  module           String
+  status           BulkImportStatus @default(UPLOADED)
+  originalFileName String           @map("original_file_name")
+  rowCount         Int              @default(0) @map("row_count")
+  validRows        Int              @default(0) @map("valid_rows")
+  invalidRows      Int              @default(0) @map("invalid_rows")
+  payload          Json
+  errors           Json?
+  expiresAt        DateTime         @map("expires_at")
+  committedAt      DateTime?        @map("committed_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  @@index([schoolId, status])
+  @@index([schoolId, expiresAt])
+  @@map("bulk_import_sessions")
+}
+
+enum BulkImportSessionStatus {
+  UPLOADED
+  VALIDATING
+  READY
+  COMMITTED
+  FAILED
+  EXPIRED
 }
