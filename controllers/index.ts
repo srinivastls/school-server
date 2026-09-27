@@ -24,3 +24,4 @@ export * from "./teacherTimetable.controllers";
 export * from "./adminDashboard.controller";
 export * from "./adminTeacherAttendance.controller";
 export * from "./adminLeave.controller";
+export * from "./platformDataLifecycle.controller";

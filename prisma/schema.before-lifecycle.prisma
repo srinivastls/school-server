@@ -22,6 +22,7 @@ model PlatformAdmin {
   updatedAt      DateTime              @updatedAt
   auditLogs      SchoolOnboardingLog[]
   schoolsCreated School[]              @relation("SchoolCreatedBy")
+  dataOperations SchoolDataOperation[]
 
   @@map("platform_admins")
 }
@@ -65,6 +66,7 @@ model School {
   marks                      Mark[]
   notifications              Notification[]
   onboardingLogs             SchoolOnboardingLog[]
+  dataOperations             SchoolDataOperation[]
   createdByPlatformAdmin     PlatformAdmin?              @relation("SchoolCreatedBy", fields: [createdByPlatformAdminId], references: [id])
   sections                   Section[]
   studentPromotions          StudentPromotion[]
@@ -799,70 +801,6 @@ model prisma_migrations_backup_20260827 {
   @@ignore
 }
 
-model bulk_import_sessions {
-  id                 String           @id
-  school_id          String           @db.Uuid
-  created_by_user_id String
-  module             String
-  status             BulkImportStatus @default(UPLOADED)
-  original_file_name String
-  row_count          Int              @default(0)
-  valid_rows         Int              @default(0)
-  invalid_rows       Int              @default(0)
-  payload            Json
-  errors             Json?
-  expires_at         DateTime
-  committed_at       DateTime?
-  created_at         DateTime         @default(now())
-  updated_at         DateTime
-
-  @@index([school_id, expires_at])
-  @@index([school_id, status])
-}
-
-model SchoolDataOperation {
-  id                       String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId                 String                    @db.Uuid
-  schoolCode               String
-  schoolName               String
-  academicYearId           String?
-  academicYearName         String?
-  operation                SchoolDataOperationType
-  status                   SchoolDataOperationStatus @default(PENDING)
-  fileName                 String?
-  downloadPath             String?
-  checksum                 String?
-  fileSize                 Int?
-  metadata                 Json?
-  createdByPlatformAdminId String?
-  createdAt                DateTime                  @default(now())
-  completedAt              DateTime?
-  errorMessage             String?
-  driveFileId              String?
-  driveUrl                 String?
-
-  @@index([schoolId, createdAt])
-  @@index([schoolId, operation, status])
-  @@map("school_data_operations")
-}
-
-model PlatformDataDeletionAudit {
-  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  schoolId                   String   @db.Uuid
-  schoolCode                 String
-  schoolName                 String
-  academicYearId             String?
-  academicYearName           String?
-  operation                  String
-  deletedAt                  DateTime @default(now())
-  performedByPlatformAdminId String?
-  details                    Json?
-
-  @@index([schoolId, deletedAt])
-  @@index([schoolCode, deletedAt])
-  @@map("platform_data_deletion_audits")
-}
-
 enum EnrollmentStatus {
   ACTIVE
   PROMOTED
@@ -977,6 +915,68 @@ enum SubscriptionPlan {
   ENTERPRISE
 }
 
+enum SchoolStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  ONBOARDING
+  ARCHIVED
+}
+
+enum SchoolDataOperationType {
+  FULL_EXPORT
+  ACADEMIC_YEAR_EXPORT
+  ACADEMIC_YEAR_DELETE
+  SCHOOL_ARCHIVE
+  SCHOOL_RESTORE
+  SCHOOL_DELETE
+}
+
+enum SchoolDataOperationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model PlatformDataDeletionAudit {
+  id              String   @id @default(uuid())
+  schoolId        String   @map("school_id")
+  schoolCode      String   @map("school_code")
+  schoolName      String   @map("school_name")
+  platformAdminId String   @map("platform_admin_id")
+  operation       String
+  backupFileName  String?  @map("backup_file_name")
+  backupChecksum  String?  @map("backup_checksum")
+  counts          Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  @@index([schoolId, createdAt])
+  @@index([platformAdminId, createdAt])
+  @@map("platform_data_deletion_audits")
+}
+
+model SchoolDataOperation {
+  id                String                    @id @default(uuid())
+  schoolId          String                    @map("school_id") @db.Uuid
+  platformAdminId   String                    @map("platform_admin_id")
+  type              SchoolDataOperationType
+  status            SchoolDataOperationStatus @default(PROCESSING)
+  academicYearId    String?                   @map("academic_year_id")
+  fileName          String?                   @map("file_name")
+  filePath          String?                   @map("file_path")
+  checksum          String?
+  fileSize          BigInt?                   @map("file_size")
+  counts            Json?
+  errorMessage      String?                   @map("error_message")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  completedAt       DateTime?                 @map("completed_at")
+  school            School                    @relation(fields: [schoolId], references: [id])
+  platformAdmin     PlatformAdmin             @relation(fields: [platformAdminId], references: [id])
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, type, status])
+  @@map("school_data_operations")
+}
+
 enum FeatureFlag {
   TC_GENERATION
   ID_CARD_GENERATION
@@ -1065,47 +1065,4 @@ enum AuditAction {
   REVOKE
   GENERATE
   REGENERATE
-}
-
-enum BulkImportSessionStatus {
-  UPLOADED
-  VALIDATING
-  READY
-  COMMITTED
-  FAILED
-  EXPIRED
-}
-
-enum BulkImportStatus {
-  UPLOADED
-  VALIDATING
-  READY
-  COMMITTED
-  FAILED
-  EXPIRED
-}
-
-enum SchoolDataOperationType {
-  FULL_EXPORT
-  ACADEMIC_YEAR_EXPORT
-  ACADEMIC_YEAR_DELETE
-  SCHOOL_ARCHIVE
-  SCHOOL_RESTORE
-  SCHOOL_DELETE
-  AUTOMATIC_BACKUP
-}
-
-enum SchoolDataOperationStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum SchoolStatus {
-  ACTIVE
-  SUSPENDED
-  EXPIRED
-  ONBOARDING
-  ARCHIVED
 }

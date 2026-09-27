@@ -14,9 +14,6 @@ export const useBulkImportRoutes = (app: Express) => {
     upload.single("file"),
   ],
   (req: Request, res: Response, next: NextFunction) => {
-    console.log("=== BULK UPLOAD DEBUG ===");
-    console.log("Module:", req.params.module);
-    console.log("Content-Type:", req.headers["content-type"]);
     console.log("File:", req.file
       ? {
           fieldname: req.file.fieldname,

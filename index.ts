@@ -3,6 +3,10 @@ import cors from "cors";
 
 import { prisma } from "./config";
 
+
+import {
+  startBackupScheduler,
+} from "./services/backupScheduler.service";
 import {
   useAuthRoutes,
   useUserRoutes,
@@ -159,6 +163,7 @@ const bootstrap = async () => {
         console.log(
           `listening on port ${port}`
         );
+        startBackupScheduler();
       }
     );
   } catch (error) {

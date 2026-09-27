@@ -1,5 +1,5 @@
 
-import { BulkImportSession,Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../config";
 
 export type SessionRow = Record<string, unknown>;

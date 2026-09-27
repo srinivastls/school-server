@@ -1,6 +1,18 @@
 import { Express } from "express";
 
-import { platformController } from "../controllers";
+import {
+  platformController,
+  getAcademicYearDeletionPreviewController,
+  exportSchoolController,
+  exportAcademicYearController,
+  getExportStatusController,
+  downloadExportController,
+  getSchoolDataOperationsController,
+  archiveSchoolController,
+  restoreSchoolController,
+  deleteAcademicYearController,
+  deleteSchoolController,
+} from "../controllers";
 
 import { authJwt } from "../middlewares";
 
@@ -77,5 +89,65 @@ app.get(
   ],
   platformController.getSchoolById
 );
+
+
+  app.get(
+    "/api/platform/schools/:schoolId/academic-years/:academicYearId/deletion-preview",
+    [verifyToken, isSuperAdmin],
+    getAcademicYearDeletionPreviewController
+  );
+
+  app.post(
+    "/api/platform/schools/:schoolId/exports/full",
+    [verifyToken, isSuperAdmin],
+    exportSchoolController
+  );
+
+  app.post(
+    "/api/platform/schools/:schoolId/exports/academic-year/:academicYearId",
+    [verifyToken, isSuperAdmin],
+    exportAcademicYearController
+  );
+
+  app.get(
+    "/api/platform/exports/:operationId",
+    [verifyToken, isSuperAdmin],
+    getExportStatusController
+  );
+
+  app.get(
+    "/api/platform/exports/:operationId/download",
+    downloadExportController
+  );
+
+  app.get(
+    "/api/platform/schools/:schoolId/data-operations",
+    [verifyToken, isSuperAdmin],
+    getSchoolDataOperationsController
+  );
+
+  app.post(
+    "/api/platform/schools/:schoolId/archive",
+    [verifyToken, isSuperAdmin],
+    archiveSchoolController
+  );
+
+  app.post(
+    "/api/platform/schools/:schoolId/restore",
+    [verifyToken, isSuperAdmin],
+    restoreSchoolController
+  );
+
+  app.delete(
+    "/api/platform/schools/:schoolId/academic-years/:academicYearId",
+    [verifyToken, isSuperAdmin],
+    deleteAcademicYearController
+  );
+
+  app.delete(
+    "/api/platform/schools/:schoolId",
+    [verifyToken, isSuperAdmin],
+    deleteSchoolController
+  );
 
 };

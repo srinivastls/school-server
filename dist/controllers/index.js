@@ -40,3 +40,4 @@ __exportStar(require("./teacherTimetable.controllers"), exports);
 __exportStar(require("./adminDashboard.controller"), exports);
 __exportStar(require("./adminTeacherAttendance.controller"), exports);
 __exportStar(require("./adminLeave.controller"), exports);
+__exportStar(require("./platformDataLifecycle.controller"), exports);

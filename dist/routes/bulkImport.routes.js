@@ -14,9 +14,6 @@ const useBulkImportRoutes = (app) => {
         middlewares_1.authJwt.isPrincipalOrAdmin,
         upload.single("file"),
     ], (req, res, next) => {
-        console.log("=== BULK UPLOAD DEBUG ===");
-        console.log("Module:", req.params.module);
-        console.log("Content-Type:", req.headers["content-type"]);
         console.log("File:", req.file
             ? {
                 fieldname: req.file.fieldname,
