@@ -352,6 +352,7 @@ const getPendingLeaveRequests =
         });
       }
 
+
       const leaves =
         await prisma.leaveRequest.findMany({
           where: {

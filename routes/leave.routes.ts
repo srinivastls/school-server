@@ -22,6 +22,7 @@ export const useLeaveRoutes = (
 
     authJwt.verifyToken,
 
+
     leaveControllers
       .createLeaveRequest
   );
@@ -42,11 +43,12 @@ export const useLeaveRoutes = (
   ============================================================ */
 
   app.get(
-    "/leave/pending",
+    "/api/leave/pending",
 
     authJwt.verifyToken,
 
-    authJwt.isAdmin,
+ 
+    authJwt.isPrincipalOrAdmin,
 
     leaveControllers
       .getPendingLeaveRequests
@@ -54,11 +56,11 @@ export const useLeaveRoutes = (
 
 
   app.patch(
-    "/leave/update",
+    "/api/leave/update",
 
     authJwt.verifyToken,
 
-    authJwt.isAdmin,
+    authJwt.isPrincipalOrAdmin,
 
     leaveControllers
       .updateLeaveRequest
@@ -66,11 +68,11 @@ export const useLeaveRoutes = (
 
 
   app.get(
-    "/leave/history",
+    "/api/leave/history",
 
     authJwt.verifyToken,
 
-    authJwt.isAdmin,
+    authJwt.isPrincipalOrAdmin,
 
     leaveControllers
       .getLeaveHistory

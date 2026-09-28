@@ -14,11 +14,11 @@ const useLeaveRoutes = (app) => {
     /* ============================================================
        ADMIN
     ============================================================ */
-    app.get("/leave/pending", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin, controllers_1.leaveControllers
+    app.get("/api/leave/pending", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isPrincipalOrAdmin, controllers_1.leaveControllers
         .getPendingLeaveRequests);
-    app.patch("/leave/update", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin, controllers_1.leaveControllers
+    app.patch("/api/leave/update", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isPrincipalOrAdmin, controllers_1.leaveControllers
         .updateLeaveRequest);
-    app.get("/leave/history", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isAdmin, controllers_1.leaveControllers
+    app.get("/api/leave/history", middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isPrincipalOrAdmin, controllers_1.leaveControllers
         .getLeaveHistory);
 };
 exports.useLeaveRoutes = useLeaveRoutes;

@@ -194,43 +194,35 @@ const getPromotionStudents = async (
        GET SOURCE CLASSES
     ======================================================== */
 
-    const sourceClasses =
-      await prisma.class.findMany({
+    const sourceClasses = await prisma.class.findMany({
+  where: {
+    schoolId,
+    academicYearId: sourceAcademicYearId,
+    ...(classId
+      ? {
+          id: classId,
+        }
+      : {}),
+  },
+  select: {
+    id: true,
+    classNumber: true,
+    displayName: true,
 
-        where: {
-
-          schoolId,
-
-          academicYearId:
-            sourceAcademicYearId,
-
-          ...(classId
-            ? {
-                id:
-                  classId,
-              }
-            : {}),
-
-        },
-
-        select: {
-
-          id: true,
-
-          classNumber: true,
-
-          displayName: true,
-
-        },
-
-        orderBy: {
-
-          classNumber:
-            "asc",
-
-        },
-
-      });
+    sections: {
+      select: {
+        id: true,
+        sectionName: true,
+      },
+      orderBy: {
+        sectionName: "asc",
+      },
+    },
+  },
+  orderBy: {
+    classNumber: "asc",
+  },
+});
 
 
     if (
@@ -398,8 +390,8 @@ const getPromotionStudents = async (
           academicYearId:
             targetAcademicYearId,
 
-          isCompleted:
-            false,
+          // isCompleted:
+          //   false,
 
         },
 
@@ -511,8 +503,8 @@ const getPromotionStudents = async (
             );
 
 
-          const eligible =
-            pendingAmount === 0;
+
+          const eligible = true;
 
 
           const suggestedClass =
@@ -1347,7 +1339,13 @@ const processStudentPromotion = async (
 
           };
 
-        }
+          
+
+        },
+        {
+    maxWait: 10000,
+    timeout: 30000,
+  }
       );
 
 
@@ -2125,7 +2123,7 @@ const processBulkStudentPromotion = async (
 
 
             if (
-              pendingAmount > 0
+              pendingAmount > 25000
             ) {
 
               throw new Error(
@@ -2277,7 +2275,11 @@ const processBulkStudentPromotion = async (
 
           return processed;
 
-        }
+        },
+        {
+    maxWait: 10000,
+    timeout: 30000,
+  }
       );
 
 

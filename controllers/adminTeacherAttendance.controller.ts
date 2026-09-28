@@ -1,0 +1,324 @@
+import dayjs from "dayjs";
+import { prisma } from "../config";
+import { handleErr } from "../utils";
+import { RoleName } from "@prisma/client";
+
+const DATE_FORMATS = ["YYYY-MM-DD", "DD/MM/YYYY"];
+
+type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE";
+type LeaveType = "CL" | "SL" | "EL" | "LWP";
+
+const getSchoolId = (req: any): string | undefined => req.user?.schoolId;
+const getUserId = (req: any): string | undefined => req.user?.id;
+
+const parseDate = (value: unknown): Date | null => {
+  if (typeof value !== "string" || !value.trim()) return null;
+  for (const format of DATE_FORMATS) {
+    const parsed = dayjs(value, format, true);
+    if (parsed.isValid()) return parsed.startOf("day").toDate();
+  }
+  return null;
+};
+
+const serializeDate = (date: Date) => dayjs(date).format("YYYY-MM-DD");
+const getAuthenticatedSchoolId = (
+  req: any
+): string | undefined => {
+
+  return req.user?.schoolId;
+};
+
+export const getTeachers = async (
+  req: any,
+  res: any
+) => {
+  try {
+    const schoolId = getAuthenticatedSchoolId(req);
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message: "Authenticated school is missing",
+      });
+    }
+
+    const { date } = req.query;
+
+    if (!date || typeof date !== "string") {
+      return res.status(400).json({
+        message: "Date is required",
+      });
+    }
+
+
+
+    const teachers = await prisma.user.findMany({
+      where: {
+        schoolId,
+        role: RoleName.TEACHER,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        employeeId: true,
+        designation: true,
+        department: true,
+
+        teacherAttendances: {
+          where: {
+            schoolId,
+            date: new Date(date),
+          },
+          select: {
+            id: true,
+            status: true,
+            leaveType: true,
+            markedByUserId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+
+
+    return res.status(200).json({
+      teachers,
+    });
+  } catch (error) {
+    console.error("❌ getTeachers error:", error);
+
+    return handleErr(error, res);
+  }
+};
+
+import { Request, Response } from "express";
+import { parseAttendanceDate } from "../utils/attendanceDate";
+
+export const getTeachersForAttendance = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    const { date } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        message: "School ID is required",
+      });
+    }
+
+    if (typeof date !== "string" || !date.trim()) {
+      return res.status(400).json({
+        message: "Date is required",
+      });
+    }
+
+    const attendanceDate = parseAttendanceDate(date);
+
+    if (!attendanceDate) {
+      return res.status(400).json({
+        message:
+          "Invalid date. Use YYYY-MM-DD or DD/MM/YYYY format.",
+      });
+    }
+
+    console.log("REQUEST DATE:", date);
+    console.log("PARSED DATE:", attendanceDate.toISOString());
+
+    const teachers = await prisma.user.findMany({
+      where: {
+        schoolId,
+        role: RoleName.TEACHER,
+        isActive: true,
+      },
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        employeeId: true,
+        designation: true,
+        department: true,
+
+        teacherAttendances: {
+          where: {
+            schoolId,
+            date: attendanceDate,
+          },
+
+          select: {
+            id: true,
+            status: true,
+            leaveType: true,
+            markedByUserId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+
+          take: 1,
+        },
+      },
+
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    const formattedTeachers = teachers.map((teacher) => {
+      const attendance = teacher.teacherAttendances[0] ?? null;
+
+      return {
+        ...teacher,
+        attendance,
+        teacherAttendances: undefined,
+      };
+    });
+
+    return res.status(200).json({
+      date: attendanceDate,
+      totalTeachers: formattedTeachers.length,
+      teachers: formattedTeachers,
+    });
+  } catch (error: unknown) {
+    console.error("❌ GET TEACHERS ERROR:", error);
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to load teachers";
+
+    return res.status(500).json({
+      message,
+    });
+  }
+};
+
+export const getDailyTeacherAttendance = async (req: any, res: any) => {
+  try {
+    const schoolId = getSchoolId(req);
+    const date = parseDate(String(req.query?.date ?? ""));
+
+    if (!schoolId) return res.status(401).json({ message: "School context missing" });
+    if (!date) return res.status(400).json({ message: "Valid date is required (YYYY-MM-DD)" });
+
+    const attendance = await prisma.teacherAttendance.findMany({
+      where: { schoolId, date },
+      include: {
+        teacher: {
+          select: { id: true, name: true, email: true, employeeId: true, designation: true, department: true },
+        },
+        markedByUser: { select: { id: true, name: true, role: true } },
+      },
+      orderBy: { teacher: { name: "asc" } },
+    });
+
+    const summary = {
+      total: attendance.length,
+      present: attendance.filter((x) => x.status === "PRESENT").length,
+      absent: attendance.filter((x) => x.status === "ABSENT").length,
+      halfDay: attendance.filter((x) => x.status === "HALF_DAY").length,
+      onLeave: attendance.filter((x) => x.status === "ON_LEAVE").length,
+    };
+
+    return res.status(200).json({ date: serializeDate(date), summary, attendance });
+  } catch (error) {
+    return handleErr(error as any, res);
+  }
+};
+
+export const bulkMarkTeacherAttendance = async (req: any, res: any) => {
+  try {
+    const schoolId = getSchoolId(req);
+    const markedByUserId = getUserId(req);
+    const date = parseAttendanceDate(req.body?.date);
+    const records = req.body?.records;
+
+    if (!schoolId || !markedByUserId) {
+      return res.status(401).json({ message: "Authenticated school user is required" });
+    }
+    if (!date) return res.status(400).json({ message: "Valid date is required (YYYY-MM-DD)" });
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ message: "records must be a non-empty array" });
+    }
+
+    const allowedStatuses: AttendanceStatus[] = ["PRESENT", "ABSENT", "HALF_DAY", "ON_LEAVE"];
+    const allowedLeaveTypes: LeaveType[] = ["CL", "SL", "EL", "LWP"];
+    const ids = records.map((item: any) => item.teacherId);
+
+    if (new Set(ids).size !== ids.length) {
+      return res.status(400).json({ message: "Duplicate teacherId values are not allowed" });
+    }
+
+    for (const item of records) {
+      if (!item.teacherId || !allowedStatuses.includes(item.status)) {
+        return res.status(400).json({ message: "Each record requires a valid teacherId and status" });
+      }
+      if (item.status === "ON_LEAVE" && !allowedLeaveTypes.includes(item.leaveType)) {
+        return res.status(400).json({ message: `Valid leaveType is required for ${item.teacherId}` });
+      }
+      if (item.status !== "ON_LEAVE" && item.leaveType != null) {
+        return res.status(400).json({ message: "leaveType is only allowed with ON_LEAVE" });
+      }
+    }
+
+    const teachers = await prisma.user.findMany({
+      where: { schoolId,
+      
+                role:
+                  RoleName.TEACHER, isActive: true },
+      select: { id: true },
+    });
+
+    const foundIds = new Set(teachers.map((teacher) => teacher.id));
+    const missingId = ids.find((id: string) => !foundIds.has(id));
+    if (missingId) return res.status(404).json({ message: `Active teacher not found: ${missingId}` });
+
+    const saved = await prisma.$transaction(async (tx) => {
+      const result = [];
+      for (const item of records) {
+        result.push(await tx.teacherAttendance.upsert({
+          where: {
+            schoolId_teacherUserId_date: {
+              schoolId,
+              teacherUserId: item.teacherId,
+              date,
+            },
+          },
+          create: {
+            schoolId,
+            teacherUserId: item.teacherId,
+            date,
+            status: item.status,
+            leaveType: item.status === "ON_LEAVE" ? item.leaveType : null,
+            markedByUserId,
+          },
+          update: {
+            status: item.status,
+            leaveType: item.status === "ON_LEAVE" ? item.leaveType : null,
+            markedByUserId,
+          },
+        }));
+      }
+      return result;
+    });
+
+    return res.status(200).json({
+      message: "Teacher attendance saved successfully",
+      date: serializeDate(date),
+      count: saved.length,
+      attendance: saved,
+    });
+  } catch (error) {
+    return handleErr(error as any, res);
+  }
+};

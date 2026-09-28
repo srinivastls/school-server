@@ -10,9 +10,12 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 /* ============================================================
    PLATFORM DASHBOARD
 ============================================================ */
+const isValidUuid = (value) => {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+};
 const getDashboard = async (req, res) => {
     try {
-        const [totalSchools, activeSchools, onboardingSchools, suspendedSchools, expiredSchools, totalStudents, totalTeachers, totalAdmins, totalPrincipals, totalParents,] = await Promise.all([
+        const [totalSchools, activeSchools, onboardingSchools, suspendedSchools, archivedSchools, expiredSchools, totalStudents, totalTeachers, totalAdmins, totalPrincipals, totalParents,] = await Promise.all([
             /* ------------------------------------------------------
                SCHOOLS
             ------------------------------------------------------ */
@@ -35,6 +38,11 @@ const getDashboard = async (req, res) => {
             config_1.prisma.school.count({
                 where: {
                     status: "EXPIRED",
+                },
+            }),
+            config_1.prisma.school.count({
+                where: {
+                    status: "ARCHIVED",
                 },
             }),
             /* ------------------------------------------------------
@@ -71,6 +79,7 @@ const getDashboard = async (req, res) => {
                 active: activeSchools,
                 onboarding: onboardingSchools,
                 suspended: suspendedSchools,
+                archived: archivedSchools,
                 expired: expiredSchools,
             },
             users: {
@@ -169,21 +178,23 @@ const getSchools = async (req, res) => {
 const getSchoolById = async (req, res) => {
     try {
         console.log("GET SCHOOL BY ID REQUEST PARAMS:", req.params);
-        /* ============================================================
-           GET ID
-        ============================================================ */
-        const { id, } = req.params;
-        /* ============================================================
-           VALIDATE ID
-        ============================================================ */
+        const { id } = req.params;
+        // ============================================================
+        // VALIDATE ID
+        // ============================================================
         if (!id) {
             return res.status(400).json({
                 message: "School ID is required.",
             });
         }
-        /* ============================================================
-           GET SCHOOL
-        ============================================================ */
+        if (!isValidUuid(id)) {
+            return res.status(400).json({
+                message: "Invalid school ID.",
+            });
+        }
+        // ============================================================
+        // GET SCHOOL
+        // ============================================================
         const school = await config_1.prisma.school.findUnique({
             where: {
                 id,
@@ -207,29 +218,41 @@ const getSchoolById = async (req, res) => {
                         users: true,
                     },
                 },
+                academicYears: {
+                    orderBy: {
+                        startDate: "desc",
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        startDate: true,
+                        endDate: true,
+                        isCurrent: true,
+                    },
+                },
             },
         });
-        /* ============================================================
-           SCHOOL NOT FOUND
-        ============================================================ */
+        // ============================================================
+        // SCHOOL NOT FOUND
+        // ============================================================
         if (!school) {
             return res.status(404).json({
                 message: "School not found.",
             });
         }
-        /* ============================================================
-           FIND PRINCIPAL
-        ============================================================ */
+        // ============================================================
+        // FIND PRINCIPAL
+        // ============================================================
         const principal = school.users.find((user) => user.role === "PRINCIPAL");
-        /* ============================================================
-           COUNT USERS BY ROLE
-        ============================================================ */
+        // ============================================================
+        // COUNT USERS BY ROLE
+        // ============================================================
         const admins = school.users.filter((user) => user.role === "ADMIN");
         const teachers = school.users.filter((user) => user.role === "TEACHER");
         const parents = school.users.filter((user) => user.role === "PARENT");
-        /* ============================================================
-           FORMAT SCHOOL
-        ============================================================ */
+        // ============================================================
+        // FORMAT SCHOOL
+        // ============================================================
         const schoolData = {
             id: school.id,
             code: school.code,
@@ -239,16 +262,16 @@ const getSchoolById = async (req, res) => {
             contactPhone: school.contactPhone,
             board: school.board,
             status: school.status,
-            /* ==========================================================
-               SUBSCRIPTION
-            ========================================================== */
+            // ==========================================================
+            // SUBSCRIPTION
+            // ==========================================================
             subscriptionPlan: school.subscriptionPlan,
             subscriptionStartDate: school.subscriptionStartDate,
             subscriptionExpiryDate: school.subscriptionExpiryDate,
             createdAt: school.createdAt,
-            /* ==========================================================
-               PRINCIPAL
-            ========================================================== */
+            // ==========================================================
+            // PRINCIPAL
+            // ==========================================================
             principal: principal
                 ? {
                     id: principal.id,
@@ -260,9 +283,13 @@ const getSchoolById = async (req, res) => {
                     lastLogin: principal.lastLogin,
                 }
                 : null,
-            /* ==========================================================
-               COUNTS
-            ========================================================== */
+            // ==========================================================
+            // ACADEMIC YEARS
+            // ==========================================================
+            academicYears: school.academicYears,
+            // ==========================================================
+            // COUNTS
+            // ==========================================================
             counts: {
                 students: school._count.students,
                 staff: school._count.users,
@@ -271,9 +298,9 @@ const getSchoolById = async (req, res) => {
                 parents: parents.length,
             },
         };
-        /* ============================================================
-           RESPONSE
-        ============================================================ */
+        // ============================================================
+        // RESPONSE
+        // ============================================================
         return res.status(200).json({
             school: schoolData,
         });

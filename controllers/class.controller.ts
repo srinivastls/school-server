@@ -157,6 +157,10 @@ const getAllClasses = async (
     const schoolId =
       getSchoolId(req);
 
+    const academicYearId =
+      req.query?.academicYearId as
+        | string;
+
     if (!schoolId) {
       return res.status(400).json({
         message:
@@ -164,10 +168,18 @@ const getAllClasses = async (
       });
     }
 
+    if (!academicYearId) {
+      return res.status(400).json({
+        message:
+          "academicYearId is required",
+      });
+    }
+
     const classes =
       await prisma.class.findMany({
         where: {
           schoolId,
+          academicYearId,
           isCompleted: false,
         },
 

@@ -23,7 +23,7 @@ export const useTeacherAttendanceRoutes = (
   app: Express
 ) => {
 app.get(
-  "/list",
+  "/api/attendance/teacher/list",
   authJwt.verifyToken,
     authJwt.isAdmin || authJwt.isPrincipal,
   teacherAttendanceControllers
@@ -55,7 +55,7 @@ app.get(
  * /attendance/teacher/mark
  */
 app.post(
-  "/mark",
+  "/api/attendance/teacher/mark",
   authJwt.verifyToken,
   authJwt.isAdmin || authJwt.isPrincipal,
   teacherAttendanceControllers
@@ -123,7 +123,7 @@ app.get(
  * /attendance/teacher/daily?date=27/08/2026
  */
 app.get(
-  "/daily",
+  "/api/attendance/teacher/daily",
   authJwt.verifyToken,
   authJwt.isAdmin || authJwt.isPrincipal,
   teacherAttendanceControllers

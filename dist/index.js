@@ -4,11 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const dotenv_1 = __importDefault(require("dotenv"));
 const cors_1 = __importDefault(require("cors"));
 const config_1 = require("./config");
+const backupScheduler_service_1 = require("./services/backupScheduler.service");
 const routes_1 = require("./routes");
-dotenv_1.default.config();
+const bulkImport_routes_1 = require("./routes/bulkImport.routes");
 const app = (0, express_1.default)();
 /* ============================================================
    MIDDLEWARE
@@ -53,6 +53,10 @@ app.get("/", (req, res) => {
 (0, routes_1.useTeacherMarksRoutes)(app);
 (0, routes_1.useTeacherProfileRoutes)(app);
 (0, routes_1.useTeacherTimetableRoutes)(app);
+(0, routes_1.useAdminDashboardRoutes)(app);
+(0, routes_1.useAdminAttendanceLeaveRoutes)(app);
+(0, bulkImport_routes_1.useBulkImportRoutes)(app);
+(0, routes_1.useBulkImportSessionRoutes)(app);
 /* ============================================================
    SERVER
 ============================================================ */
@@ -67,11 +71,14 @@ const bootstrap = async () => {
         -------------------------------------------------------- */
         await config_1.prisma.$connect();
         console.log("connected to postgres sql");
+        await config_1.prisma.$queryRaw `SELECT 1`;
+        console.log("Prisma connected and query succeeded");
         /* --------------------------------------------------------
            START SERVER
         -------------------------------------------------------- */
         app.listen(port, "0.0.0.0", () => {
             console.log(`listening on port ${port}`);
+            (0, backupScheduler_service_1.startBackupScheduler)();
         });
     }
     catch (error) {

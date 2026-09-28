@@ -591,6 +591,36 @@ const getAvailableClassTeachers = async (req, res) => {
         return (0, utils_1.handleErr)(error, res);
     }
 };
+const deleteSection = async (req, res) => {
+    try {
+        const schoolId = getSchoolId(req);
+        const sectionId = req.query.sectionId;
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "schoolId is required",
+            });
+        }
+        if (!sectionId) {
+            return res.status(400).json({
+                message: "sectionId is required",
+            });
+        }
+        const section = await config_1.prisma.section.delete({
+            where: {
+                id: sectionId,
+                schoolId,
+            },
+        });
+        return res.status(200).json({
+            message: "Section deleted successfully",
+            section,
+        });
+    }
+    catch (error) {
+        console.error("DELETE SECTION ERROR:", error);
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
 const getStudentsBySection = async (req, res) => {
     try {
         const schoolId = getSchoolId(req);
@@ -776,6 +806,7 @@ exports.sectionControllers = {
     copySectionsToAcademicYear,
     getSectionsByClass,
     getStudentsBySection,
+    deleteSection,
     assignClassTeacher,
     removeClassTeacher,
     getAvailableClassTeachers,

@@ -33,5 +33,15 @@ const usePlatformRoutes = (app) => {
         verifyToken,
         isSuperAdmin,
     ], controllers_1.platformController.getSchoolById);
+    app.get("/api/platform/schools/:schoolId/academic-years/:academicYearId/deletion-preview", [verifyToken, isSuperAdmin], controllers_1.getAcademicYearDeletionPreviewController);
+    app.post("/api/platform/schools/:schoolId/exports/full", [verifyToken, isSuperAdmin], controllers_1.exportSchoolController);
+    app.post("/api/platform/schools/:schoolId/exports/academic-year/:academicYearId", [verifyToken, isSuperAdmin], controllers_1.exportAcademicYearController);
+    app.get("/api/platform/exports/:operationId", [verifyToken, isSuperAdmin], controllers_1.getExportStatusController);
+    app.get("/api/platform/exports/:operationId/download", controllers_1.downloadExportController);
+    app.get("/api/platform/schools/:schoolId/data-operations", [verifyToken, isSuperAdmin], controllers_1.getSchoolDataOperationsController);
+    app.post("/api/platform/schools/:schoolId/archive", [verifyToken, isSuperAdmin], controllers_1.archiveSchoolController);
+    app.post("/api/platform/schools/:schoolId/restore", [verifyToken, isSuperAdmin], controllers_1.restoreSchoolController);
+    app.delete("/api/platform/schools/:schoolId/academic-years/:academicYearId", [verifyToken, isSuperAdmin], controllers_1.deleteAcademicYearController);
+    app.delete("/api/platform/schools/:schoolId", [verifyToken, isSuperAdmin], controllers_1.deleteSchoolController);
 };
 exports.usePlatformRoutes = usePlatformRoutes;
