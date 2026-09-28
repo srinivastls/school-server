@@ -6,5 +6,6 @@ const middlewares_1 = require("../middlewares");
 const useUserRoutes = (app) => {
     app.get("/api/users/getAll", [middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isSuperAdmin], controllers_1.userController.getAllUsers);
     app.get("/api/users/profile", [middlewares_1.authJwt.verifyToken], controllers_1.userController.getProfile);
+    app.get("/api/users/platformAdminProfile", [middlewares_1.authJwt.verifyToken, middlewares_1.authJwt.isSuperAdmin], controllers_1.userController.getPlatformAdminProfile);
 };
 exports.useUserRoutes = useUserRoutes;

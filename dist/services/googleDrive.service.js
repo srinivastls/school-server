@@ -11,7 +11,12 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const googleapis_1 = require("googleapis");
 const dotenv_1 = __importDefault(require("dotenv"));
-const serviceAccount = JSON.parse(fs_1.default.readFileSync(path_1.default.resolve(process.cwd(), "config", "sa.json"), "utf-8"));
+// const serviceAccount = JSON.parse(
+//   fs.readFileSync(
+//     path.resolve(process.cwd(), "config", "sa.json"),
+//     "utf-8"
+//   )
+// );
 // ------------------------------------------------------------
 // ENVIRONMENT
 // ------------------------------------------------------------
@@ -38,6 +43,21 @@ dotenv_1.default.config({
 const SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ];
+// ------------------------------------------------------------
+// TYPES
+// ------------------------------------------------------------
+// interface ServiceAccountCredentials {
+//   type: string;
+//   project_id: string;
+//   private_key_id: string;
+//   private_key: string;
+//   client_email: string;
+//   client_id: string;
+//   auth_uri: string;
+//   token_uri: string;
+//   auth_provider_x509_cert_url: string;
+//   client_x509_cert_url: string;
+// }
 // const credentials =
 //   serviceAccount as ServiceAccountCredentials;
 // ------------------------------------------------------------

@@ -14,4 +14,10 @@ export const useUserRoutes = (app: Express) => {
     [authJwt.verifyToken],
     userController.getProfile
   );
+
+  app.get(
+    "/api/users/platformAdminProfile",
+    [authJwt.verifyToken, authJwt.isSuperAdmin],
+    userController.getPlatformAdminProfile
+  );
 };
