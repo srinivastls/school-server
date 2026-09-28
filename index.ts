@@ -163,7 +163,7 @@ const bootstrap = async () => {
         console.log(
           `listening on port ${port}`
         );
-        startBackupScheduler();
+        //startBackupScheduler();
       }
     );
   } catch (error) {

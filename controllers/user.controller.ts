@@ -57,6 +57,8 @@ const getProfile = async (
       });
     }
 
+    console.log("PROFILE userId:", userId);
+
     const user =
       await prisma.user.findUnique({
         where: { id: userId },
@@ -101,9 +103,72 @@ const getProfile = async (
 
 };
 
+const getPlatformAdminProfile = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: "Authenticated user is missing",
+      });
+    }
+
+    console.log("PLATFORM ADMIN PROFILE userId:", userId);
+
+    const platformAdmin =
+      await prisma.platformAdmin.findUnique({
+        where: {
+          id: userId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          lastLogin: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+    if (!platformAdmin) {
+      return res.status(404).json({
+        message: "Platform admin not found",
+      });
+    }
+
+    return res.status(200).json({
+      profile: {
+        id: platformAdmin.id,
+        schoolId: "",
+        name: platformAdmin.name,
+        email: platformAdmin.email,
+        phone: null,
+        role: platformAdmin.role,
+        designation: "Platform Admin",
+        department: null,
+        employeeId: null,
+        profilePhotoUrl: null,
+        isActive: platformAdmin.isActive,
+        mustChangePassword: false,
+        lastLogin: platformAdmin.lastLogin,
+        createdAt: platformAdmin.createdAt,
+        updatedAt: platformAdmin.updatedAt,
+      },
+    });
+  } catch (error) {
+    return handleErr(error, res);
+  }
+};
+
 
 
 export const userController = {
   getAllUsers,
   getProfile,
+  getPlatformAdminProfile,
 };
