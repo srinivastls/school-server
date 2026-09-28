@@ -3,12 +3,14 @@ import path from "path";
 import { google } from "googleapis";
 import dotenv from "dotenv";
 
-const serviceAccount = JSON.parse(
-  fs.readFileSync(
-    path.resolve(process.cwd(), "config", "sa.json"),
-    "utf-8"
-  )
-);
+// const serviceAccount = JSON.parse(
+//   fs.readFileSync(
+//     path.resolve(process.cwd(), "config", "sa.json"),
+//     "utf-8"
+//   )
+// );
+
+
 
 // ------------------------------------------------------------
 // ENVIRONMENT
@@ -17,6 +19,23 @@ const serviceAccount = JSON.parse(
 dotenv.config({
   path: path.resolve(process.cwd(), ".env"),
 });
+
+// const serviceAccount = {
+//   type: process.env.GOOGLE_SERVICE_ACCOUNT_TYPE,
+//   project_id: process.env.GOOGLE_SERVICE_ACCOUNT_PROJECT_ID,
+//   private_key_id: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_ID,
+
+//   private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+
+//   client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+//   client_id: process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_ID,
+//   auth_uri: process.env.GOOGLE_SERVICE_ACCOUNT_AUTH_URI,
+//   token_uri: process.env.GOOGLE_SERVICE_ACCOUNT_TOKEN_URI,
+//   auth_provider_x509_cert_url:
+//     process.env.GOOGLE_SERVICE_ACCOUNT_AUTH_PROVIDER_X509_CERT_URL,
+//   client_x509_cert_url:
+//     process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_X509_CERT_URL,
+// };
 
 // ------------------------------------------------------------
 // GOOGLE DRIVE
@@ -30,21 +49,21 @@ const SCOPES = [
 // TYPES
 // ------------------------------------------------------------
 
-interface ServiceAccountCredentials {
-  type: string;
-  project_id: string;
-  private_key_id: string;
-  private_key: string;
-  client_email: string;
-  client_id: string;
-  auth_uri: string;
-  token_uri: string;
-  auth_provider_x509_cert_url: string;
-  client_x509_cert_url: string;
-}
+// interface ServiceAccountCredentials {
+//   type: string;
+//   project_id: string;
+//   private_key_id: string;
+//   private_key: string;
+//   client_email: string;
+//   client_id: string;
+//   auth_uri: string;
+//   token_uri: string;
+//   auth_provider_x509_cert_url: string;
+//   client_x509_cert_url: string;
+// }
 
-const credentials =
-  serviceAccount as ServiceAccountCredentials;
+// const credentials =
+//   serviceAccount as ServiceAccountCredentials;
 
 // ------------------------------------------------------------
 // BACKUP FOLDER
@@ -63,31 +82,55 @@ function getBackupFolderId(): string {
   return folderId;
 }
 
+const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+  ?.trim()
+  .replace(/^["']|["']$/g, "")
+  .replace(/\\n/g, "\n")
+  .replace(/\r/g, "")
+  .trim();
+
+if (!privateKey) {
+  throw new Error("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY is missing");
+}
+
+
+const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
+
+if (!clientEmail) {
+  throw new Error("GOOGLE_SERVICE_ACCOUNT_EMAIL is missing");
+}
+
 // ------------------------------------------------------------
 // DRIVE CLIENT
 // ------------------------------------------------------------
 
 function getDriveClient() {
-  if (!credentials.client_email) {
+  if (!clientEmail) {
     throw new Error(
       "Google service account client_email is missing from config/sa.json."
     );
   }
 
-  if (!credentials.private_key) {
+  if (!privateKey) {
     throw new Error(
       "Google service account private_key is missing from config/sa.json."
     );
   }
 
+  
+
+
+
+
+
   const auth =
     new google.auth.GoogleAuth({
       credentials: {
         client_email:
-          credentials.client_email,
+          clientEmail,
 
         private_key:
-          credentials.private_key,
+          privateKey,
       },
 
       scopes: SCOPES,
