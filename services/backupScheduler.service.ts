@@ -21,7 +21,7 @@ export function startBackupScheduler(): void {
   }
 
   backupJob = cron.schedule(
-    "* */3 * * *",
+    "* */3 * * *", // Run every 3 hours
 
     async () => {
       // ------------------------------------------------

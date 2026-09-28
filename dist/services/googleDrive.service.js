@@ -18,13 +18,28 @@ const serviceAccount = JSON.parse(fs_1.default.readFileSync(path_1.default.resol
 dotenv_1.default.config({
     path: path_1.default.resolve(process.cwd(), ".env"),
 });
+// const serviceAccount = {
+//   type: process.env.GOOGLE_SERVICE_ACCOUNT_TYPE,
+//   project_id: process.env.GOOGLE_SERVICE_ACCOUNT_PROJECT_ID,
+//   private_key_id: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_ID,
+//   private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+//   client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+//   client_id: process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_ID,
+//   auth_uri: process.env.GOOGLE_SERVICE_ACCOUNT_AUTH_URI,
+//   token_uri: process.env.GOOGLE_SERVICE_ACCOUNT_TOKEN_URI,
+//   auth_provider_x509_cert_url:
+//     process.env.GOOGLE_SERVICE_ACCOUNT_AUTH_PROVIDER_X509_CERT_URL,
+//   client_x509_cert_url:
+//     process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_X509_CERT_URL,
+// };
 // ------------------------------------------------------------
 // GOOGLE DRIVE
 // ------------------------------------------------------------
 const SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ];
-const credentials = serviceAccount;
+// const credentials =
+//   serviceAccount as ServiceAccountCredentials;
 // ------------------------------------------------------------
 // BACKUP FOLDER
 // ------------------------------------------------------------
@@ -35,20 +50,33 @@ function getBackupFolderId() {
     }
     return folderId;
 }
+const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+    ?.trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\\n/g, "\n")
+    .replace(/\r/g, "")
+    .trim();
+if (!privateKey) {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY is missing");
+}
+const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
+if (!clientEmail) {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_EMAIL is missing");
+}
 // ------------------------------------------------------------
 // DRIVE CLIENT
 // ------------------------------------------------------------
 function getDriveClient() {
-    if (!credentials.client_email) {
+    if (!clientEmail) {
         throw new Error("Google service account client_email is missing from config/sa.json.");
     }
-    if (!credentials.private_key) {
+    if (!privateKey) {
         throw new Error("Google service account private_key is missing from config/sa.json.");
     }
     const auth = new googleapis_1.google.auth.GoogleAuth({
         credentials: {
-            client_email: credentials.client_email,
-            private_key: credentials.private_key,
+            client_email: clientEmail,
+            private_key: privateKey,
         },
         scopes: SCOPES,
     });

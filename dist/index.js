@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const config_1 = require("./config");
-const backupScheduler_service_1 = require("./services/backupScheduler.service");
 const routes_1 = require("./routes");
 const bulkImport_routes_1 = require("./routes/bulkImport.routes");
 const app = (0, express_1.default)();
@@ -78,7 +77,7 @@ const bootstrap = async () => {
         -------------------------------------------------------- */
         app.listen(port, "0.0.0.0", () => {
             console.log(`listening on port ${port}`);
-            (0, backupScheduler_service_1.startBackupScheduler)();
+            //startBackupScheduler();
         });
     }
     catch (error) {

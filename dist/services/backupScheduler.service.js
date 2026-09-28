@@ -15,7 +15,8 @@ function startBackupScheduler() {
         console.log("[Backup Scheduler] Already running");
         return;
     }
-    backupJob = node_cron_1.default.schedule("* */3 * * *", async () => {
+    backupJob = node_cron_1.default.schedule("* */3 * * *", // Run every 3 hours
+    async () => {
         // ------------------------------------------------
         // Prevent overlapping jobs
         // ------------------------------------------------
