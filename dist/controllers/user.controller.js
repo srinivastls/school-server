@@ -125,8 +125,38 @@ const getPlatformAdminProfile = async (req, res) => {
         return (0, utils_1.handleErr)(error, res);
     }
 };
+const updatePrincipal = async (req, res) => {
+    try {
+        const userId = req.userId;
+        if (!userId) {
+            return res.status(400).json({
+                message: "Authenticated user is missing",
+            });
+        }
+        const { name, email, phone, designation, department, employeeId } = req.body;
+        const principal = await config_1.prisma.user.update({
+            where: { id: userId },
+            data: {
+                name: name?.trim() || null,
+                email: email?.trim().toLowerCase() || null,
+                phone: phone?.trim() || null,
+                designation: designation?.trim() || null,
+                department: department?.trim() || null,
+                employeeId: employeeId?.trim() || null,
+            },
+        });
+        return res.status(200).json({
+            message: "Principal updated successfully",
+            principal,
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
 exports.userController = {
     getAllUsers,
     getProfile,
     getPlatformAdminProfile,
+    updatePrincipal,
 };

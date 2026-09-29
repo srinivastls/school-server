@@ -521,15 +521,20 @@ const createPrincipal = async (req, res) => {
                     email: normalizedEmail,
                     passwordHash,
                     role: "PRINCIPAL",
-                    designation: designation?.trim() ||
-                        "Principal",
-                    phone: phone?.trim() ||
-                        null,
-                    department: department?.trim() ||
-                        null,
-                    employeeId: employeeId?.trim() ||
-                        null,
+                    designation: designation?.trim() || "Principal",
+                    phone: phone?.trim() || null,
+                    department: department?.trim() || null,
+                    employeeId: employeeId?.trim() || null,
                     mustChangePassword: true,
+                },
+            });
+            // Activate the school after principal creation
+            const updatedSchool = await tx.school.update({
+                where: {
+                    id: schoolId,
+                },
+                data: {
+                    status: "ACTIVE",
                 },
             });
             await tx.schoolOnboardingLog.create({
@@ -543,17 +548,141 @@ const createPrincipal = async (req, res) => {
                     },
                 },
             });
-            return createdPrincipal;
+            return {
+                principal: createdPrincipal,
+                school: updatedSchool,
+            };
         });
         return res.status(201).json({
             message: "Principal created successfully",
             principal: {
+                id: principal.principal.id,
+                name: principal.principal.name,
+                email: principal.principal.email,
+                designation: principal.principal.designation,
+                schoolId: principal.principal.schoolId,
+                mustChangePassword: principal.principal.mustChangePassword,
+            },
+            school: {
+                id: principal.school.id,
+                code: principal.school.code,
+                name: principal.school.name,
+                status: principal.school.status,
+            },
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+const deletePrincipal = async (req, res) => {
+    try {
+        const { schoolId } = req.params;
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "School ID is required",
+            });
+        }
+        const school = await config_1.prisma.school.findUnique({
+            where: { id: schoolId },
+        });
+        if (!school) {
+            return res.status(404).json({
+                message: "School not found",
+            });
+        }
+        const principal = await config_1.prisma.user.findFirst({
+            where: {
+                schoolId,
+                role: "PRINCIPAL",
+            },
+        });
+        if (!principal) {
+            return res.status(404).json({
+                message: "Principal not found for this school",
+            });
+        }
+        await config_1.prisma.$transaction(async (tx) => {
+            await tx.user.delete({
+                where: { id: principal.id },
+            });
+            await tx.schoolOnboardingLog.create({
+                data: {
+                    schoolId,
+                    platformAdminId: req.userId,
+                    action: "PRINCIPAL_DELETED",
+                    details: {
+                        principalId: principal.id,
+                        email: principal.email,
+                    },
+                },
+            });
+        });
+        return res.status(200).json({
+            message: "Principal deleted successfully",
+        });
+    }
+    catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+const updatePrincipal = async (req, res) => {
+    try {
+        const { schoolId } = req.params;
+        if (!schoolId) {
+            return res.status(400).json({
+                message: "School ID is required",
+            });
+        }
+        const school = await config_1.prisma.school.findUnique({
+            where: { id: schoolId },
+        });
+        if (!school) {
+            return res.status(404).json({
+                message: "School not found",
+            });
+        }
+        const princi = await config_1.prisma.user.findFirst({
+            where: {
+                schoolId,
+                role: "PRINCIPAL",
+            },
+        });
+        if (!princi) {
+            return res.status(404).json({
+                message: "Principal not found for this school",
+            });
+        }
+        const userId = princi.id;
+        if (!userId) {
+            return res.status(400).json({
+                message: "Authenticated user is missing",
+            });
+        }
+        const { name, email, phone, designation, department, employeeId } = req.body;
+        const principal = await config_1.prisma.user.update({
+            where: { id: userId },
+            data: {
+                name: name?.trim() || null,
+                email: email?.trim().toLowerCase() || null,
+                phone: phone?.trim() || null,
+                designation: designation?.trim() || null,
+                department: department?.trim() || null,
+                employeeId: employeeId?.trim() || null,
+            },
+        });
+        return res.status(200).json({
+            message: "Principal updated successfully",
+            principal: {
                 id: principal.id,
                 name: principal.name,
                 email: principal.email,
+                phone: principal.phone,
                 designation: principal.designation,
-                schoolId: principal.schoolId,
-                mustChangePassword: principal.mustChangePassword,
+                department: principal.department,
+                employeeId: principal.employeeId,
+                isActive: principal.isActive,
+                lastLogin: principal.lastLogin,
             },
         });
     }
@@ -568,4 +697,6 @@ exports.platformController = {
     createSchool,
     createPrincipal,
     getSchoolById,
+    deletePrincipal,
+    updatePrincipal,
 };

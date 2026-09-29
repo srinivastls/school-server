@@ -138,6 +138,12 @@ app.get(
     restoreSchoolController
   );
 
+  app.patch(
+    "/api/platform/schools/:schoolId/principal",
+    [verifyToken, isSuperAdmin],
+    platformController.updatePrincipal
+  );
+
   app.delete(
     "/api/platform/schools/:schoolId/academic-years/:academicYearId",
     [verifyToken, isSuperAdmin],
@@ -148,6 +154,12 @@ app.get(
     "/api/platform/schools/:schoolId",
     [verifyToken, isSuperAdmin],
     deleteSchoolController
+  );
+
+  app.delete(
+    "/api/platform/schools/:schoolId/principal",
+    [verifyToken, isSuperAdmin],
+    platformController.deletePrincipal
   );
 
 };
