@@ -41,7 +41,9 @@ const usePlatformRoutes = (app) => {
     app.get("/api/platform/schools/:schoolId/data-operations", [verifyToken, isSuperAdmin], controllers_1.getSchoolDataOperationsController);
     app.post("/api/platform/schools/:schoolId/archive", [verifyToken, isSuperAdmin], controllers_1.archiveSchoolController);
     app.post("/api/platform/schools/:schoolId/restore", [verifyToken, isSuperAdmin], controllers_1.restoreSchoolController);
+    app.patch("/api/platform/schools/:schoolId/principal", [verifyToken, isSuperAdmin], controllers_1.platformController.updatePrincipal);
     app.delete("/api/platform/schools/:schoolId/academic-years/:academicYearId", [verifyToken, isSuperAdmin], controllers_1.deleteAcademicYearController);
     app.delete("/api/platform/schools/:schoolId", [verifyToken, isSuperAdmin], controllers_1.deleteSchoolController);
+    app.delete("/api/platform/schools/:schoolId/principal", [verifyToken, isSuperAdmin], controllers_1.platformController.deletePrincipal);
 };
 exports.usePlatformRoutes = usePlatformRoutes;
