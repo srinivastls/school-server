@@ -921,17 +921,17 @@ const deletePrincipal = async (
         where: { id: principal.id },
       });
 
-      await tx.schoolOnboardingLog.create({
-        data: {
-          schoolId,
-          platformAdminId: req.userId!,
-          action: "PRINCIPAL_DELETED",
-          details: {
-            principalId: principal.id,
-            email: principal.email,
-          },
-        } as any,
-      });
+      // await tx.schoolOnboardingLog.create({
+      //   data: {
+      //     schoolId,
+      //     platformAdminId: req.userId!,
+      //     action: "PRINCIPAL_DELETED",
+      //     details: {
+      //       principalId: principal.id,
+      //       email: principal.email,
+      //     },
+      //   } as any,
+      // });
     });
 
     return res.status(200).json({
