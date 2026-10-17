@@ -67,6 +67,11 @@ export const useAuthRoutes = (
     authController.signin
   );
 
+  app.post(
+    "/api/auth/refresh",
+    authController.refresh
+  );
+
 
   app.get(
   "/api/auth/admins",

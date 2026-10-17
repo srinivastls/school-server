@@ -25,3 +25,7 @@ export * from "./adminDashboard.controller";
 export * from "./adminTeacherAttendance.controller";
 export * from "./adminLeave.controller";
 export * from "./platformDataLifecycle.controller";
+export * from "./principalTimetable.controller";
+export * from "./principalExam.controller";
+export * from "./principalExamSubject.controller";
+export * from "./principalExamTimetable.controller";

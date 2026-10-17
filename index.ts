@@ -30,7 +30,14 @@ import {
   useTeacherTimetableRoutes,
   useAdminDashboardRoutes,
   useAdminAttendanceLeaveRoutes,
-  useBulkImportSessionRoutes
+  useBulkImportSessionRoutes,
+  useSubjectRoutes,
+  useTeacherSubjectMappingRoutes,
+  usePrincipalTimetableRoutes,
+  usePrincipalExamRoutes,
+  usePrincipalExamSubjectRoutes,
+  usePrincipalExamTimetableRoutes
+
   
 
 } from "./routes";
@@ -123,6 +130,12 @@ useAdminDashboardRoutes(app);
 useAdminAttendanceLeaveRoutes(app);
 useBulkImportRoutes(app);
 useBulkImportSessionRoutes(app);
+useSubjectRoutes(app);
+useTeacherSubjectMappingRoutes(app);
+usePrincipalTimetableRoutes(app);
+usePrincipalExamRoutes(app);
+usePrincipalExamSubjectRoutes(app);
+usePrincipalExamTimetableRoutes(app);
 /* ============================================================
    SERVER
 ============================================================ */

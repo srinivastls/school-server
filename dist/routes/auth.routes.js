@@ -43,6 +43,7 @@ const useAuthRoutes = (app) => {
        based on role.
     ========================================================== */
     app.post("/api/auth/signin", controllers_1.authController.signin);
+    app.post("/api/auth/refresh", controllers_1.authController.refresh);
     app.get("/api/auth/admins", [
         middlewares_1.authJwt.verifyToken,
         middlewares_1.authJwt.isPrincipal,

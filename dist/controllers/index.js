@@ -41,3 +41,7 @@ __exportStar(require("./adminDashboard.controller"), exports);
 __exportStar(require("./adminTeacherAttendance.controller"), exports);
 __exportStar(require("./adminLeave.controller"), exports);
 __exportStar(require("./platformDataLifecycle.controller"), exports);
+__exportStar(require("./principalTimetable.controller"), exports);
+__exportStar(require("./principalExam.controller"), exports);
+__exportStar(require("./principalExamSubject.controller"), exports);
+__exportStar(require("./principalExamTimetable.controller"), exports);

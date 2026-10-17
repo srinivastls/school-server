@@ -347,6 +347,24 @@ model StudentParentLink {
   @@map("student_parent_links")
 }
 
+
+model RefreshSession {
+  id           String   @id @default(uuid())
+  tokenHash    String   @unique
+  userId       String?
+  adminId      String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_sessions")
+}
+
 model Coupon {
   id                    String       @id @default(uuid())
   schoolId              String       @map("school_id") @db.Uuid
