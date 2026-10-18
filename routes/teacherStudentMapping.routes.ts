@@ -20,7 +20,7 @@ export const useTeacherSubjectMappingRoutes = (
   app.get(
     "/api/teacher-subject/teachers",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     teacherSubjectMappingControllers
       .getTeachersForMapping
   );
@@ -33,7 +33,7 @@ export const useTeacherSubjectMappingRoutes = (
   app.get(
     "/api/teacher-subject/options",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     teacherSubjectMappingControllers
       .getSubjectsForMapping
   );
@@ -46,7 +46,7 @@ export const useTeacherSubjectMappingRoutes = (
   app.get(
     "/api/teacher-subject",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     teacherSubjectMappingControllers
       .getTeacherSubjectMappings
   );
@@ -59,7 +59,7 @@ export const useTeacherSubjectMappingRoutes = (
   app.post(
     "/api/teacher-subject",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     teacherSubjectMappingControllers
       .assignTeacherSubject
   );
@@ -72,7 +72,7 @@ export const useTeacherSubjectMappingRoutes = (
   app.delete(
     "/api/teacher-subject/:mappingId",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     teacherSubjectMappingControllers
       .deleteTeacherSubjectMapping
   );

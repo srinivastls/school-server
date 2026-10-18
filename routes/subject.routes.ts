@@ -6,35 +6,35 @@ export const useSubjectRoutes = (app: Express) => {
   app.get(
     "/api/subjects/classes",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     subjectControllers.getSubjectClasses,
   );
 
   app.get(
     "/api/subjects",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin  ,
     subjectControllers.getSubjects,
   );
 
   app.post(
     "/api/subjects",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     subjectControllers.createSubject,
   );
 
   app.put(
     "/api/subjects/:subjectId",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     subjectControllers.updateSubject,
   );
 
   app.delete(
     "/api/subjects/:subjectId",
     authJwt.verifyToken,
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
     subjectControllers.deleteSubject,
   );
 };
