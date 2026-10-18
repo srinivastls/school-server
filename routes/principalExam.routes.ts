@@ -12,10 +12,10 @@ const {
 
 export const usePrincipalExamRoutes = (app: Express) => {
   
-    app.get("/api/principal-exams/options",[verifyToken, isPrincipal] , principalExamControllers.getOptions);
-    app.get("/api/principal-exams",[verifyToken, isPrincipal] , principalExamControllers.getExams);
-    app.post("/api/principal-exams", [verifyToken, isPrincipal], principalExamControllers.createExam);
-    app.put("/api/principal-exams/:examId", [verifyToken, isPrincipal], principalExamControllers.updateExam);
-    app.patch("/api/principal-exams/:examId/publish", [verifyToken, isPrincipal], principalExamControllers.setPublished);
-    app.delete("/api/principal-exams/:examId", [verifyToken, isPrincipal], principalExamControllers.deleteExam);
+    app.get("/api/principal-exams/options",[verifyToken, isPrincipalOrAdmin] , principalExamControllers.getOptions);
+    app.get("/api/principal-exams",[verifyToken, isPrincipalOrAdmin] , principalExamControllers.getExams);
+    app.post("/api/principal-exams", [verifyToken, isPrincipalOrAdmin], principalExamControllers.createExam);
+    app.put("/api/principal-exams/:examId", [verifyToken, isPrincipalOrAdmin], principalExamControllers.updateExam);
+    app.patch("/api/principal-exams/:examId/publish", [verifyToken, isPrincipalOrAdmin], principalExamControllers.setPublished);
+    app.delete("/api/principal-exams/:examId", [verifyToken, isPrincipalOrAdmin], principalExamControllers.deleteExam);
 };

@@ -26,7 +26,7 @@ export const useStudentPromotionRoutes = (
 
     authJwt.verifyToken,
 
-    authJwt.isPrincipal,
+    authJwt.isPrincipalOrAdmin,
 
     studentPromotionControllers
       .getPromotionStudents
@@ -35,7 +35,7 @@ export const useStudentPromotionRoutes = (
   app.post(
   "/api/academic-year/promotion/student",
   authJwt.verifyToken,
-  authJwt.isPrincipal,
+  authJwt.isPrincipalOrAdmin,
   studentPromotionControllers
     .processStudentPromotion
 );
@@ -43,7 +43,7 @@ export const useStudentPromotionRoutes = (
 app.post(
   "/api/academic-year/promotion/students/bulk",
   authJwt.verifyToken,
-  authJwt.isPrincipal,
+  authJwt.isPrincipalOrAdmin,
   studentPromotionControllers
     .processBulkStudentPromotion
 );

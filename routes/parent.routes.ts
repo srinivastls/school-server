@@ -16,7 +16,6 @@ import {
 ============================================================ */
 const {
   verifyToken,
-  isPrincipal,
   isParent,
 } = authJwt;
 
