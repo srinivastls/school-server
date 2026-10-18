@@ -56,6 +56,12 @@ app.get("/", (req, res) => {
 (0, routes_1.useAdminAttendanceLeaveRoutes)(app);
 (0, bulkImport_routes_1.useBulkImportRoutes)(app);
 (0, routes_1.useBulkImportSessionRoutes)(app);
+(0, routes_1.useSubjectRoutes)(app);
+(0, routes_1.useTeacherSubjectMappingRoutes)(app);
+(0, routes_1.usePrincipalTimetableRoutes)(app);
+(0, routes_1.usePrincipalExamRoutes)(app);
+(0, routes_1.usePrincipalExamSubjectRoutes)(app);
+(0, routes_1.usePrincipalExamTimetableRoutes)(app);
 /* ============================================================
    SERVER
 ============================================================ */

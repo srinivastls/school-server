@@ -618,7 +618,7 @@ const createSchool = async (
                     ? (subscriptionPlan as any)
                     : "FREE",
 
-                status: "ONBOARDING",
+                status: "ACTIVE",
 
                 gracePeriodDays:
                   gracePeriodDays ?? 7,
@@ -760,9 +760,40 @@ const createPrincipal = async (
       });
 
     if (existingPrincipal) {
-      return res.status(409).json({
+      // If a principal already exists for this school
+      // call the updatePrincipal function instead of creating a new one
+
+      const updatedPrincipal = await prisma.user.update({
+        where: {
+          id: existingPrincipal.id,
+        },
+        data: {
+          name: name.trim(),
+          email: normalizedEmail,
+          phone: phone?.trim() || null,
+          designation:
+            designation?.trim() || "Principal",
+          department:
+            department?.trim() || null,
+          employeeId:
+            employeeId?.trim() || null,
+        },
+      });
+
+      return res.status(200).json({
         message:
-          "This school already has a principal",
+          "Principal already exists. Updated the existing principal's details.",
+        principal: {
+          id: updatedPrincipal.id,
+          name: updatedPrincipal.name,
+          email: updatedPrincipal.email,
+          designation:
+            updatedPrincipal.designation,
+          schoolId:
+            updatedPrincipal.schoolId,
+          mustChangePassword:
+            updatedPrincipal.mustChangePassword,
+        },
       });
     }
 

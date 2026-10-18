@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authJwt_1 = require("../middlewares/authJwt");
+const controllers_1 = require("../controllers");
+const router = (0, express_1.Router)();
+router.use(authJwt_1.authJwt.verifyToken, authJwt_1.authJwt.isPrincipal);
+router.get("/options", controllers_1.principalExamControllers.getOptions);
+router.get("/", controllers_1.principalExamControllers.getExams);
+router.post("/", controllers_1.principalExamControllers.createExam);
+router.put("/:examId", controllers_1.principalExamControllers.updateExam);
+router.patch("/:examId/publish", controllers_1.principalExamControllers.setPublished);
+router.delete("/:examId", controllers_1.principalExamControllers.deleteExam);
+exports.default = router;

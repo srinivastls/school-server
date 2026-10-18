@@ -25,6 +25,16 @@ const normalizeSchoolCode = (schoolCode) => {
 const getAuthenticatedSchoolId = (req) => {
     return req.user?.schoolId;
 };
+const ACCESS_TOKEN_EXPIRES_IN = 15 * 60;
+const REFRESH_TOKEN_EXPIRES_IN = 7 * 24 * 60 * 60;
+const createAccessToken = (payload) => {
+    return jsonwebtoken_1.default.sign(payload, config_1.authConfig.secret, {
+        expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+    });
+};
+const createRefreshToken = (payload) => {
+    return jsonwebtoken_1.default.sign({ id: payload.id, type: payload.type }, config_1.authConfig.secret, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+};
 /* ============================================================
    SCHOOL USER SIGN IN
    ------------------------------------------------------------
@@ -152,17 +162,16 @@ const signin = async (req, res) => {
                 lastLogin: new Date(),
             },
         });
-        /* --------------------------------------------------------
-           JWT
-        -------------------------------------------------------- */
-        const accessToken = jsonwebtoken_1.default.sign({
+        const accessToken = createAccessToken({
             id: user.id,
             schoolId: school.id,
             schoolCode: school.code,
             role: user.role,
             type: "SCHOOL_USER",
-        }, config_1.authConfig.secret, {
-            expiresIn: ACCESS_TOKEN_TTL,
+        });
+        const refreshToken = createRefreshToken({
+            id: user.id,
+            type: "SCHOOL_USER",
         });
         /* --------------------------------------------------------
            RESPONSE
@@ -170,7 +179,9 @@ const signin = async (req, res) => {
         return res.status(200).json({
             id: user.id,
             accessToken,
-            accessTokenTTL: ACCESS_TOKEN_TTL,
+            accessTokenTTL: ACCESS_TOKEN_EXPIRES_IN,
+            refreshToken,
+            refreshTokenTTL: REFRESH_TOKEN_EXPIRES_IN,
             name: user.name,
             email: user.email,
             role: user.role,
@@ -182,6 +193,98 @@ const signin = async (req, res) => {
         });
     }
     catch (error) {
+        return (0, utils_1.handleErr)(error, res);
+    }
+};
+const refresh = async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+        if (!refreshToken) {
+            return res.status(401).json({
+                message: "Refresh token required",
+                code: "REFRESH_TOKEN_REQUIRED",
+            });
+        }
+        const decoded = jsonwebtoken_1.default.verify(refreshToken, config_1.authConfig.secret);
+        if (!decoded.id || !decoded.type) {
+            return res.status(401).json({
+                message: "Invalid refresh token",
+                code: "INVALID_REFRESH_TOKEN",
+            });
+        }
+        if (decoded.type === "PLATFORM_ADMIN") {
+            const admin = await config_1.prisma.platformAdmin.findUnique({
+                where: { id: decoded.id },
+            });
+            if (!admin) {
+                return res.status(401).json({
+                    message: "Platform admin not found",
+                    code: "SESSION_INVALID",
+                });
+            }
+            if (!admin.isActive) {
+                return res.status(403).json({
+                    message: "Platform admin account is inactive",
+                    code: "ACCOUNT_INACTIVE",
+                });
+            }
+            const accessToken = createAccessToken({
+                id: admin.id,
+                role: admin.role,
+                type: "PLATFORM_ADMIN",
+            });
+            return res.status(200).json({
+                accessToken,
+                accessTokenTTL: ACCESS_TOKEN_EXPIRES_IN,
+            });
+        }
+        const user = await config_1.prisma.user.findUnique({
+            where: { id: decoded.id },
+            include: { school: true },
+        });
+        if (!user) {
+            return res.status(401).json({
+                message: "User not found",
+                code: "SESSION_INVALID",
+            });
+        }
+        if (!user.isActive) {
+            return res.status(403).json({
+                message: "User account is inactive",
+                code: "ACCOUNT_INACTIVE",
+            });
+        }
+        if (user.school.status !== "ACTIVE") {
+            return res.status(403).json({
+                message: "School account is not active",
+                code: "SCHOOL_INACTIVE",
+            });
+        }
+        const accessToken = createAccessToken({
+            id: user.id,
+            schoolId: user.school.id,
+            schoolCode: user.school.code,
+            role: user.role,
+            type: "SCHOOL_USER",
+        });
+        return res.status(200).json({
+            accessToken,
+            accessTokenTTL: ACCESS_TOKEN_EXPIRES_IN,
+        });
+    }
+    catch (error) {
+        if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
+            return res.status(401).json({
+                message: "Refresh token expired",
+                code: "REFRESH_TOKEN_EXPIRED",
+            });
+        }
+        if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
+            return res.status(401).json({
+                message: "Invalid refresh token",
+                code: "INVALID_REFRESH_TOKEN",
+            });
+        }
         return (0, utils_1.handleErr)(error, res);
     }
 };
@@ -305,15 +408,14 @@ const platformAdminSignin = async (req, res) => {
                 lastLogin: new Date(),
             },
         });
-        /* --------------------------------------------------------
-           JWT
-        -------------------------------------------------------- */
-        const accessToken = jsonwebtoken_1.default.sign({
+        const accessToken = createAccessToken({
             id: platformAdmin.id,
             role: platformAdmin.role,
             type: "PLATFORM_ADMIN",
-        }, config_1.authConfig.secret, {
-            expiresIn: ACCESS_TOKEN_TTL,
+        });
+        const refreshToken = createRefreshToken({
+            id: platformAdmin.id,
+            type: "PLATFORM_ADMIN",
         });
         /* --------------------------------------------------------
            RESPONSE
@@ -321,7 +423,9 @@ const platformAdminSignin = async (req, res) => {
         return res.status(200).json({
             id: platformAdmin.id,
             accessToken,
-            accessTokenTTL: ACCESS_TOKEN_TTL,
+            accessTokenTTL: ACCESS_TOKEN_EXPIRES_IN,
+            refreshToken,
+            refreshTokenTTL: REFRESH_TOKEN_EXPIRES_IN,
             name: platformAdmin.name,
             email: platformAdmin.email,
             role: platformAdmin.role,
@@ -341,9 +445,12 @@ const createPrincipal = async (req, res) => {
     try {
         const { name, email, password, designation, phone, department, employeeId, } = req.body;
         const schoolId = req.params.schoolId;
-        /* --------------------------------------------------------
-           VALIDATION
-        -------------------------------------------------------- */
+        const platformAdminId = req.userId;
+        if (!platformAdminId) {
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
+        }
         if (!schoolId ||
             !name ||
             !email ||
@@ -352,10 +459,12 @@ const createPrincipal = async (req, res) => {
                 message: "schoolId, name, email and password are required",
             });
         }
-        const normalizedEmail = normalizeEmail(email);
-        /* --------------------------------------------------------
-           FIND SCHOOL
-        -------------------------------------------------------- */
+        if (password.length < 8) {
+            return res.status(400).json({
+                message: "Password must be at least 8 characters",
+            });
+        }
+        const normalizedEmail = email.trim().toLowerCase();
         const school = await config_1.prisma.school.findUnique({
             where: {
                 id: schoolId,
@@ -366,32 +475,46 @@ const createPrincipal = async (req, res) => {
                 message: "School not found",
             });
         }
-        /* --------------------------------------------------------
-           SCHOOL STATUS
-        -------------------------------------------------------- */
         if (school.status === "SUSPENDED" ||
             school.status === "EXPIRED") {
             return res.status(403).json({
-                message: "School is not available",
+                message: "Cannot create principal for a suspended or expired school",
             });
         }
-        /* --------------------------------------------------------
-           ONE PRINCIPAL PER SCHOOL
-        -------------------------------------------------------- */
         const existingPrincipal = await config_1.prisma.user.findFirst({
             where: {
                 schoolId,
-                role: client_1.RoleName.PRINCIPAL,
+                role: "PRINCIPAL",
             },
         });
         if (existingPrincipal) {
-            return res.status(409).json({
-                message: "This school already has a principal",
+            // If a principal already exists for this school
+            // call the updatePrincipal function instead of creating a new one
+            const updatedPrincipal = await config_1.prisma.user.update({
+                where: {
+                    id: existingPrincipal.id,
+                },
+                data: {
+                    name: name.trim(),
+                    email: normalizedEmail,
+                    phone: phone?.trim() || null,
+                    designation: designation?.trim() || "Principal",
+                    department: department?.trim() || null,
+                    employeeId: employeeId?.trim() || null,
+                },
+            });
+            return res.status(200).json({
+                message: "Principal already exists. Updated the existing principal's details.",
+                principal: {
+                    id: updatedPrincipal.id,
+                    name: updatedPrincipal.name,
+                    email: updatedPrincipal.email,
+                    designation: updatedPrincipal.designation,
+                    schoolId: updatedPrincipal.schoolId,
+                    mustChangePassword: updatedPrincipal.mustChangePassword,
+                },
             });
         }
-        /* --------------------------------------------------------
-           CHECK EMAIL
-        -------------------------------------------------------- */
         const existingUser = await config_1.prisma.user.findUnique({
             where: {
                 schoolId_email: {
@@ -405,30 +528,63 @@ const createPrincipal = async (req, res) => {
                 message: "User with this email already exists in this school",
             });
         }
-        /* --------------------------------------------------------
-           PASSWORD
-        -------------------------------------------------------- */
         const passwordHash = await bcrypt_1.default.hash(password, 10);
-        /* --------------------------------------------------------
-           CREATE PRINCIPAL
-        -------------------------------------------------------- */
-        const principal = await config_1.prisma.user.create({
-            data: {
-                schoolId,
-                name,
-                email: normalizedEmail,
-                passwordHash,
-                role: client_1.RoleName.PRINCIPAL,
-                designation: designation ??
-                    "Principal",
-                phone: phone ?? null,
-                department: department ?? null,
-                employeeId: employeeId ?? null,
-            },
+        const principal = await config_1.prisma.$transaction(async (tx) => {
+            const createdPrincipal = await tx.user.create({
+                data: {
+                    schoolId,
+                    name: name.trim(),
+                    email: normalizedEmail,
+                    passwordHash,
+                    role: "PRINCIPAL",
+                    designation: designation?.trim() || "Principal",
+                    phone: phone?.trim() || null,
+                    department: department?.trim() || null,
+                    employeeId: employeeId?.trim() || null,
+                    mustChangePassword: true,
+                },
+            });
+            // Activate the school after principal creation
+            const updatedSchool = await tx.school.update({
+                where: {
+                    id: schoolId,
+                },
+                data: {
+                    status: "ACTIVE",
+                },
+            });
+            await tx.schoolOnboardingLog.create({
+                data: {
+                    schoolId,
+                    platformAdminId,
+                    action: "CREDENTIALS_GENERATED",
+                    details: {
+                        principalId: createdPrincipal.id,
+                        email: createdPrincipal.email,
+                    },
+                },
+            });
+            return {
+                principal: createdPrincipal,
+                school: updatedSchool,
+            };
         });
         return res.status(201).json({
             message: "Principal created successfully",
-            id: principal.id,
+            principal: {
+                id: principal.principal.id,
+                name: principal.principal.name,
+                email: principal.principal.email,
+                designation: principal.principal.designation,
+                schoolId: principal.principal.schoolId,
+                mustChangePassword: principal.principal.mustChangePassword,
+            },
+            school: {
+                id: principal.school.id,
+                code: principal.school.code,
+                name: principal.school.name,
+                status: principal.school.status,
+            },
         });
     }
     catch (error) {
@@ -886,5 +1042,6 @@ exports.authController = {
     getTeachers,
     updateTeacherStatus,
     updateAdminStatus,
+    refresh,
     delete: deleteUser,
 };

@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authJwt_1 = require("../middlewares/authJwt");
+const controllers_1 = require("../controllers");
+const router = (0, express_1.Router)();
+router.use(authJwt_1.authJwt.verifyToken, authJwt_1.authJwt.isPrincipal);
+router.get("/api/principal-exam-timetable/options", controllers_1.principalExamTimetableControllers.getOptions);
+router.get("/api/principal-exam-timetable", controllers_1.principalExamTimetableControllers.getAll);
+router.post("/api/principal-exam-timetable", controllers_1.principalExamTimetableControllers.create);
+router.put("/api/principal-exam-timetable/:timetableId", controllers_1.principalExamTimetableControllers.update);
+router.delete("/api/principal-exam-timetable/:timetableId", controllers_1.principalExamTimetableControllers.delete);
+exports.default = router;

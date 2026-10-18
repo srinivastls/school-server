@@ -1944,6 +1944,9 @@ async function deleteSchool(schoolId, confirmation, platformAdminId) {
                 const count = await tx.$executeRawUnsafe(sql, schoolId);
                 deletedCounts[name] = Number(count);
             }
+        }, {
+            timeout: 60000,
+            maxWait: 10000,
         });
         // ----------------------------------------------------------
         // OPERATION COMPLETE

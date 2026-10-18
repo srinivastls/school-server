@@ -3,7 +3,6 @@ import {
   Request,
   Response,
 } from "express";
-
 import jwt from "jsonwebtoken";
 
 import {
@@ -18,45 +17,16 @@ import {
 
 import { handleErr } from "../utils";
 
-/* ============================================================
-   JWT PAYLOAD
-============================================================ */
-
 type JwtPayload = {
   id: string;
   userId?: string;
-
   schoolId?: string;
   schoolCode?: string;
-
   role?: RoleName;
-
   type?:
     | "PLATFORM_ADMIN"
     | "SCHOOL_USER";
 };
-
-/* ============================================================
-   REQUEST USER
-============================================================ */
-
-type AuthenticatedUser = {
-  id: string;
-
-  schoolId?: string;
-
-  schoolCode?: string;
-
-  role?: RoleName;
-
-  type?:
-    | "PLATFORM_ADMIN"
-    | "SCHOOL_USER";
-};
-
-/* ============================================================
-   VERIFY TOKEN
-============================================================ */
 
 const verifyToken = (
   req: Request,
@@ -64,9 +34,7 @@ const verifyToken = (
   next: NextFunction
 ) => {
   try {
-    const header =
-      req.headers["x-access-token"];
-
+    const header = req.headers["x-access-token"];
     const token =
       typeof header === "string"
         ? header
@@ -76,8 +44,8 @@ const verifyToken = (
 
     if (!token) {
       return res.status(403).json({
-        message:
-          "No auth token provided",
+        message: "No auth token provided",
+        code: "TOKEN_MISSING",
       });
     }
 
@@ -85,73 +53,63 @@ const verifyToken = (
       token,
       authConfig.secret,
       (err, decoded) => {
+        if (err) {
+          // This is the important distinction for automatic refresh.
+          if (err instanceof jwt.TokenExpiredError) {
+            return res.status(401).json({
+              message: "Access token expired",
+              code: "TOKEN_EXPIRED",
+            });
+          }
+
+          console.error(
+            "JWT verification error:",
+            err.name,
+            err.message
+          );
+
+          return res.status(401).json({
+            message: "Invalid access token",
+            code: "INVALID_TOKEN",
+          });
+        }
+
         if (
-          err ||
           typeof decoded !== "object" ||
           decoded === null
         ) {
-          console.log(
-            "JWT verification error:",
-            token,
-            err
-          );
           return res.status(401).json({
-            message:
-              "Unauthorized",
+            message: "Invalid access token",
+            code: "INVALID_TOKEN",
           });
         }
 
-        const payload =
-          decoded as JwtPayload;
+        const payload = decoded as JwtPayload;
 
         if (!payload.id) {
           return res.status(401).json({
-            message:
-              "Invalid auth token",
+            message: "Invalid auth token",
+            code: "INVALID_TOKEN",
           });
         }
 
-        /*
-         * Backward compatibility.
-         */
-        req.userId =
-          payload.id;
+        req.userId = payload.id;
 
-        /*
-         * Store complete authentication
-         * context.
-         */
         req.user = {
-          id:
-            payload.id,
-
-          schoolId:
-            payload.schoolId,
-
-          schoolCode:
-            payload.schoolCode,
-
-          role:
-            payload.role,
-
-          type:
-            payload.type,
+          id: payload.id,
+          schoolId: payload.schoolId,
+          schoolCode: payload.schoolCode,
+          role: payload.role,
+          type: payload.type,
         };
 
         next();
       }
     );
   } catch (err) {
-    return handleErr(
-      err,
-      res
-    );
+    return handleErr(err, res);
   }
 };
-
-/* ============================================================
-   PLATFORM ADMIN
-============================================================ */
 
 const isSuperAdmin = async (
   req: Request,
@@ -167,33 +125,26 @@ const isSuperAdmin = async (
       });
     }
 
-    if (
-      req.user?.type !== "PLATFORM_ADMIN"
-    ) {
+    if (req.user?.type !== "PLATFORM_ADMIN") {
       return res.status(403).json({
-        message:
-          "Invalid platform authentication",
+        message: "Invalid platform authentication",
       });
     }
 
     const platformAdmin =
       await prisma.platformAdmin.findUnique({
-        where: {
-          id: userId,
-        },
+        where: { id: userId },
       });
 
     if (!platformAdmin) {
       return res.status(403).json({
-        message:
-          "Require platform admin access",
+        message: "Require platform admin access",
       });
     }
 
     if (!platformAdmin.isActive) {
       return res.status(403).json({
-        message:
-          "Platform admin account is inactive",
+        message: "Platform admin account is inactive",
       });
     }
 
@@ -202,8 +153,7 @@ const isSuperAdmin = async (
       PlatformAdminRole.PLATFORM_ADMIN
     ) {
       return res.status(403).json({
-        message:
-          "Require platform admin access",
+        message: "Require platform admin access",
       });
     }
 
@@ -212,79 +162,48 @@ const isSuperAdmin = async (
     return handleErr(err, res);
   }
 };
-/* ============================================================
-   LOAD SCHOOL USER
-============================================================ */
 
-const getAuthenticatedSchoolUser =
-  async (
-    req: Request,
-    res: Response
-  ) => {
-    const userId =
-      req.userId;
+const getAuthenticatedSchoolUser = async (
+  req: Request,
+  res: Response
+) => {
+  const userId = req.userId;
 
-    if (!userId) {
-      res.status(401).json({
-        message:
-          "Unauthorized ser ",
-      });
+  if (!userId) {
+    res.status(401).json({
+      message: "Unauthorized",
+    });
+    return null;
+  }
 
-      return null;
-    }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
-      });
+  if (!user) {
+    res.status(401).json({
+      message: "Unauthorized",
+    });
+    return null;
+  }
 
-    if (!user) {
-      res.status(401).json({
-        message:
-          "Unauthorized",
-      });
+  if (!user.isActive) {
+    res.status(403).json({
+      message: "User account is inactive",
+    });
+    return null;
+  }
 
-      return null;
-    }
-
-    if (!user.isActive) {
-      res.status(403).json({
-        message:
-          "User account is inactive",
-      });
-
-      return null;
-    }
-
-    /*
-     * The school from the database is
-     * the authoritative tenant.
-     */
-    req.user = {
-      id:
-        user.id,
-
-      schoolId:
-        user.schoolId,
-
-      schoolCode:
-        req.user?.schoolCode,
-
-      role:
-        user.role,
-
-      type:
-        "SCHOOL_USER",
-    };
-
-    return user;
+  req.user = {
+    id: user.id,
+    schoolId: user.schoolId,
+    schoolCode: req.user?.schoolCode,
+    role: user.role,
+    type: "SCHOOL_USER",
   };
 
-/* ============================================================
-   PRINCIPAL
-============================================================ */
+  return user;
+};
 
 const isPrincipal = async (
   req: Request,
@@ -292,65 +211,42 @@ const isPrincipal = async (
   next: NextFunction
 ) => {
   try {
-    const user =
-      await getAuthenticatedSchoolUser(
-        req,
-        res
-      );
+    const user = await getAuthenticatedSchoolUser(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return;
-    }
-
-    if (
-      user.role !==
-      RoleName.PRINCIPAL
-    ) {
+    if (user.role !== RoleName.PRINCIPAL) {
       return res.status(403).json({
-        message:
-          "Require principal role",
+        message: "Require principal role",
       });
     }
 
     next();
   } catch (err) {
-    return handleErr(
-      err,
-      res
-    );
+    return handleErr(err, res);
   }
 };
 
-const isPrincipalOrAdmin = (req: any, res: any, next: any) => {
+const isPrincipalOrAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const role = req.user?.role;
 
-  if (role !== "PRINCIPAL" && role !== "ADMIN") {
+  if (
+    role !== RoleName.PRINCIPAL &&
+    role !== RoleName.ADMIN
+  ) {
     return res.status(403).json({
-      message: "Access denied. Principal or Admin role required.",
+      message:
+        "Access denied. Principal or Admin role required.",
     });
   }
 
   next();
 };
 
-/* ============================================================
-   OWNER
-============================================================ */
-
-/*
- * Old application used OWNER.
- *
- * New schema uses PRINCIPAL.
- *
- * Keep alias so existing routes
- * don't immediately break.
- */
-const isOwner =
-  isPrincipal;
-
-/* ============================================================
-   ADMIN
-============================================================ */
+const isOwner = isPrincipal;
 
 const isAdmin = async (
   req: Request,
@@ -358,43 +254,23 @@ const isAdmin = async (
   next: NextFunction
 ) => {
   try {
-    const user =
-      await getAuthenticatedSchoolUser(
-        req,
-        res
-      );
+    const user = await getAuthenticatedSchoolUser(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return;
-    }
-
-    /*
-     * Principal has all admin permissions.
-     */
     if (
-      user.role !==
-        RoleName.ADMIN &&
-      user.role !==
-        RoleName.PRINCIPAL
+      user.role !== RoleName.ADMIN &&
+      user.role !== RoleName.PRINCIPAL
     ) {
       return res.status(403).json({
-        message:
-          "Require admin role",
+        message: "Require admin role",
       });
     }
 
     next();
   } catch (err) {
-    return handleErr(
-      err,
-      res
-    );
+    return handleErr(err, res);
   }
 };
-
-/* ============================================================
-   TEACHER
-============================================================ */
 
 const isTeacher = async (
   req: Request,
@@ -402,38 +278,20 @@ const isTeacher = async (
   next: NextFunction
 ) => {
   try {
-    const user =
-      await getAuthenticatedSchoolUser(
-        req,
-        res
-      );
+    const user = await getAuthenticatedSchoolUser(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return;
-    }
-
-    if (
-      user.role !==
-      RoleName.TEACHER
-    ) {
+    if (user.role !== RoleName.TEACHER) {
       return res.status(403).json({
-        message:
-          "Require teacher role",
+        message: "Require teacher role",
       });
     }
 
     next();
   } catch (err) {
-    return handleErr(
-      err,
-      res
-    );
+    return handleErr(err, res);
   }
 };
-
-/* ============================================================
-   PARENT
-============================================================ */
 
 const isParent = async (
   req: Request,
@@ -441,38 +299,20 @@ const isParent = async (
   next: NextFunction
 ) => {
   try {
-    const user =
-      await getAuthenticatedSchoolUser(
-        req,
-        res
-      );
+    const user = await getAuthenticatedSchoolUser(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return;
-    }
-
-    if (
-      user.role !==
-      RoleName.PARENT
-    ) {
+    if (user.role !== RoleName.PARENT) {
       return res.status(403).json({
-        message:
-          "Require parent role",
+        message: "Require parent role",
       });
     }
 
     next();
   } catch (err) {
-    return handleErr(
-      err,
-      res
-    );
+    return handleErr(err, res);
   }
 };
-
-/* ============================================================
-   SCHOOL USER
-============================================================ */
 
 const isSchoolUser = async (
   req: Request,
@@ -480,24 +320,10 @@ const isSchoolUser = async (
   next: NextFunction
 ) => {
   try {
-    const user =
-      await getAuthenticatedSchoolUser(
-        req,
-        res
-      );
+    const user = await getAuthenticatedSchoolUser(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return;
-    }
-
-    /*
-     * Ensure this is not a platform
-     * administrator token.
-     */
-    if (
-      req.user?.type ===
-      "PLATFORM_ADMIN"
-    ) {
+    if (req.user?.type === "PLATFORM_ADMIN") {
       return res.status(403).json({
         message:
           "School user authentication required",
@@ -506,31 +332,18 @@ const isSchoolUser = async (
 
     next();
   } catch (err) {
-    return handleErr(
-      err,
-      res
-    );
+    return handleErr(err, res);
   }
 };
 
-/* ============================================================
-   EXPORT
-============================================================ */
-
 export const authJwt = {
   verifyToken,
-
-  /* Platform */
   isSuperAdmin,
-
-  /* School */
   isSchoolUser,
   isPrincipal,
   isAdmin,
   isTeacher,
   isParent,
   isPrincipalOrAdmin,
-
-  /* Compatibility */
   isOwner,
 };

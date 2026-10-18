@@ -39,3 +39,8 @@ __exportStar(require("./teacherTimetable.routes"), exports);
 __exportStar(require("./adminDashboard.routes"), exports);
 __exportStar(require("./adminAttendanceLeave.routes"), exports);
 __exportStar(require("./bulkImportSession.routes"), exports);
+__exportStar(require("./subject.routes"), exports);
+__exportStar(require("./principalTimetable.routes"), exports);
+__exportStar(require("./principalExam.routes"), exports);
+__exportStar(require("./principalExamSubject.routes"), exports);
+__exportStar(require("./principalExamTimetable.routes"), exports);
