@@ -36,9 +36,14 @@ import {
   usePrincipalTimetableRoutes,
   usePrincipalExamRoutes,
   usePrincipalExamSubjectRoutes,
-  usePrincipalExamTimetableRoutes
-
-  
+  usePrincipalExamTimetableRoutes,
+  usePrincipalResultsRoutes,
+  useParentResultsRoutes,
+  usePrincipalReportCardRoutes,
+  usePrincipalReportCardAnalyticsRoutes,
+  usePrincipalStudentPerformanceTrendRoutes,
+  useTeacherStudentPerformanceTrendRoutes,
+  useTeacherReportCardRoutes,
 
 } from "./routes";
 import { useBulkImportRoutes } from "./routes/bulkImport.routes";
@@ -136,6 +141,14 @@ usePrincipalTimetableRoutes(app);
 usePrincipalExamRoutes(app);
 usePrincipalExamSubjectRoutes(app);
 usePrincipalExamTimetableRoutes(app);
+usePrincipalResultsRoutes(app);
+useParentResultsRoutes(app);
+usePrincipalReportCardRoutes(app);
+usePrincipalReportCardAnalyticsRoutes(app);
+usePrincipalStudentPerformanceTrendRoutes(app);
+useTeacherStudentPerformanceTrendRoutes(app);
+useTeacherReportCardRoutes(app);
+
 /* ============================================================
    SERVER
 ============================================================ */

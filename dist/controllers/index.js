@@ -45,3 +45,5 @@ __exportStar(require("./principalTimetable.controller"), exports);
 __exportStar(require("./principalExam.controller"), exports);
 __exportStar(require("./principalExamSubject.controller"), exports);
 __exportStar(require("./principalExamTimetable.controller"), exports);
+__exportStar(require("./principalResults.controller"), exports);
+__exportStar(require("./parentResults.controller"), exports);

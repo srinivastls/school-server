@@ -62,6 +62,13 @@ app.get("/", (req, res) => {
 (0, routes_1.usePrincipalExamRoutes)(app);
 (0, routes_1.usePrincipalExamSubjectRoutes)(app);
 (0, routes_1.usePrincipalExamTimetableRoutes)(app);
+(0, routes_1.usePrincipalResultsRoutes)(app);
+(0, routes_1.useParentResultsRoutes)(app);
+(0, routes_1.usePrincipalReportCardRoutes)(app);
+(0, routes_1.usePrincipalReportCardAnalyticsRoutes)(app);
+(0, routes_1.usePrincipalStudentPerformanceTrendRoutes)(app);
+(0, routes_1.useTeacherStudentPerformanceTrendRoutes)(app);
+(0, routes_1.useTeacherReportCardRoutes)(app);
 /* ============================================================
    SERVER
 ============================================================ */

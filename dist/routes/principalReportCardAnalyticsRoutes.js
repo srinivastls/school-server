@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authJwt_1 = require("../middlewares/authJwt");
+const principalReportCardAnalyticsControllers_1 = require("../controllers/principalReportCardAnalyticsControllers");
+const router = (0, express_1.Router)();
+router.use(authJwt_1.authJwt.verifyToken, authJwt_1.authJwt.isPrincipal);
+router.get("/options", principalReportCardAnalyticsControllers_1.getReportCardAnalyticsOptions);
+router.get("/", principalReportCardAnalyticsControllers_1.getReportCardAnalytics);
+exports.default = router;
