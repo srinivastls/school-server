@@ -51,3 +51,4 @@ __exportStar(require("./principalReportCardAnalytics.routes"), exports);
 __exportStar(require("./principalStudentPerformanceTrend.routes"), exports);
 __exportStar(require("./teacherStudentPerformanceTrend.routes"), exports);
 __exportStar(require("./teacherReportCardRoutes"), exports);
+__exportStar(require("./bulkImportExport.routes"), exports);

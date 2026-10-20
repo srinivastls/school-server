@@ -69,6 +69,7 @@ app.get("/", (req, res) => {
 (0, routes_1.usePrincipalStudentPerformanceTrendRoutes)(app);
 (0, routes_1.useTeacherStudentPerformanceTrendRoutes)(app);
 (0, routes_1.useTeacherReportCardRoutes)(app);
+(0, routes_1.useBulkImportExportRoutes)(app);
 /* ============================================================
    SERVER
 ============================================================ */

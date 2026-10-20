@@ -35,3 +35,5 @@ export * from "./principalReportCardAnalytics.routes"
 export * from "./principalStudentPerformanceTrend.routes"
 export * from "./teacherStudentPerformanceTrend.routes"
 export * from "./teacherReportCardRoutes"
+export * from "./bulkImportExport.routes"
+

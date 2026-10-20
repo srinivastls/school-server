@@ -44,6 +44,7 @@ import {
   usePrincipalStudentPerformanceTrendRoutes,
   useTeacherStudentPerformanceTrendRoutes,
   useTeacherReportCardRoutes,
+  useBulkImportExportRoutes,
 
 } from "./routes";
 import { useBulkImportRoutes } from "./routes/bulkImport.routes";
@@ -148,6 +149,7 @@ usePrincipalReportCardAnalyticsRoutes(app);
 usePrincipalStudentPerformanceTrendRoutes(app);
 useTeacherStudentPerformanceTrendRoutes(app);
 useTeacherReportCardRoutes(app);
+useBulkImportExportRoutes(app);
 
 /* ============================================================
    SERVER
