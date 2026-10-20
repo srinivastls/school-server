@@ -29,3 +29,5 @@ export * from "./principalTimetable.controller";
 export * from "./principalExam.controller";
 export * from "./principalExamSubject.controller";
 export * from "./principalExamTimetable.controller";
+export * from "./principalResults.controller";
+export * from "./parentResults.controller";

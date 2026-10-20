@@ -6,7 +6,7 @@ const middlewares_1 = require("../middlewares");
 /* ============================================================
    PARENT DASHBOARD
 ============================================================ */
-const { verifyToken, isPrincipal, isParent, } = middlewares_1.authJwt;
+const { verifyToken, isParent, } = middlewares_1.authJwt;
 const useParentRoutes = (app) => {
     app.get("/api/parent/dashboard", [
         verifyToken,

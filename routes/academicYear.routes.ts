@@ -22,7 +22,7 @@ export const useAcademicYearRoutes = (
   app.get(
     "/api/academic-year",
     authJwt.verifyToken,
-    authJwt.isAdmin || authJwt.isPrincipal,
+    authJwt.isAdmin || authJwt.isPrincipal || authJwt.isTeacher || authJwt.isParent,
     academicYearControllers.getAcademicYears
   );
 
@@ -36,7 +36,7 @@ export const useAcademicYearRoutes = (
   app.get(
     "/api/academic-year/current",
     authJwt.verifyToken,
-    authJwt.isAdmin || authJwt.isPrincipal,
+    //authJwt.isAdmin || authJwt.isPrincipal || authJwt.isTeacher || authJwt.isParent,
     academicYearControllers.getCurrentAcademicYear
   );
 
@@ -48,9 +48,9 @@ export const useAcademicYearRoutes = (
   ========================================================== */
 
   app.get(
-    "/academic-year/:academicYearId",
+    "/api/academic-year/:academicYearId",
     authJwt.verifyToken,
-    authJwt.isAdmin || authJwt.isPrincipal,
+    authJwt.isAdmin || authJwt.isPrincipal || authJwt.isTeacher || authJwt.isParent,
     academicYearControllers.getAcademicYearById
   );
 
@@ -64,7 +64,7 @@ export const useAcademicYearRoutes = (
   app.post(
     "/api/academic-year",
     authJwt.verifyToken,
-    authJwt.isAdmin || authJwt.isPrincipal,
+    authJwt.isAdmin || authJwt.isPrincipal || authJwt.isTeacher || authJwt.isParent,
     academicYearControllers.createAcademicYear
   );
 

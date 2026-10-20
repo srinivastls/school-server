@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authJwt_1 = require("../middlewares/authJwt");
+const principalReportCardControllers_1 = require("../controllers/principalReportCardControllers");
+const router = (0, express_1.Router)();
+router.use(authJwt_1.authJwt.verifyToken, authJwt_1.authJwt.isPrincipal);
+router.get("/options", principalReportCardControllers_1.getReportCardOptions);
+router.get("/preview", principalReportCardControllers_1.getReportCardPreview);
+router.patch("/:examId/publish", principalReportCardControllers_1.publishReportCards);
+exports.default = router;
