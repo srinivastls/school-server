@@ -59,7 +59,7 @@ const getAuthenticatedSchoolId = (
 
 
 const ACCESS_TOKEN_EXPIRES_IN = 4 * 60;
-const REFRESH_TOKEN_EXPIRES_IN = 7 * 24 * 60 * 60;
+const REFRESH_TOKEN_EXPIRES_IN = 5 * 60;
 
 const createAccessToken = (payload: {
   id: string;
