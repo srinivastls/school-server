@@ -1,6 +1,7 @@
 import { Request, Response } from "../types";
 import { prisma } from "../config";
 import { handleErr } from "../utils";
+import { emitStudentWhatsAppEvent } from "../services/whatsappEvent.service";
 
 /* ============================================================
    GET MARKS ENTRY OPTIONS
@@ -1065,6 +1066,26 @@ const saveTeacherMarks = async (
         }
       }
     );
+
+    if (finalize) {
+      const marksByStudentId = new Map(
+        marks.map((item: any) => [
+          item.studentId,
+          item.isAbsent ? "Absent" : String(item.marksObtained ?? ""),
+        ])
+      );
+      await emitStudentWhatsAppEvent({
+        schoolId,
+        service: "student_marks",
+        studentIds: marks.map((item: any) => item.studentId),
+        parameters: (student) => [
+          student.name,
+          String(subjectId),
+          marksByStudentId.get(student.id) ?? "",
+          String(examSubject.maxMarks),
+        ],
+      });
+    }
 
     return res.status(200).json({
       message: finalize

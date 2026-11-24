@@ -1,7 +1,9 @@
 import express from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 
 import { prisma } from "./config";
+import { createOpenApiDocument } from "./docs/openapi";
 
 
 import {
@@ -150,6 +152,20 @@ usePrincipalStudentPerformanceTrendRoutes(app);
 useTeacherStudentPerformanceTrendRoutes(app);
 useTeacherReportCardRoutes(app);
 useBulkImportExportRoutes(app);
+
+const openApiDocument = createOpenApiDocument(app);
+
+app.get("/api-docs.json", (req, res) => {
+  res.json(openApiDocument);
+});
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(openApiDocument, {
+    customSiteTitle: "Oxford EMUP API Docs",
+  })
+);
 
 /* ============================================================
    SERVER

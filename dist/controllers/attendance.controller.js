@@ -8,6 +8,7 @@ const dayjs_1 = __importDefault(require("dayjs"));
 const customParseFormat_1 = __importDefault(require("dayjs/plugin/customParseFormat"));
 const config_1 = require("../config");
 const utils_1 = require("../utils");
+const whatsappEvent_service_1 = require("../services/whatsappEvent.service");
 dayjs_1.default.extend(customParseFormat_1.default);
 /* ============================================================
    HELPERS
@@ -278,6 +279,17 @@ const markStudentAttendance = async (req, res) => {
             holiday: saved.filter(item => item.status ===
                 "HOLIDAY").length,
         };
+        const statusByStudentId = new Map(saved.map((item) => [item.studentId, item.status]));
+        await (0, whatsappEvent_service_1.emitStudentWhatsAppEvent)({
+            schoolId,
+            service: "student_attendance",
+            studentIds: saved.map((item) => item.studentId),
+            parameters: (student) => [
+                student.name,
+                statusByStudentId.get(student.id) ?? "UNKNOWN",
+                date,
+            ],
+        });
         return res.status(200).json({
             message: "Student attendance marked successfully",
             date,

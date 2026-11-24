@@ -5,7 +5,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const config_1 = require("./config");
+const openapi_1 = require("./docs/openapi");
 const routes_1 = require("./routes");
 const bulkImport_routes_1 = require("./routes/bulkImport.routes");
 const app = (0, express_1.default)();
@@ -70,6 +72,13 @@ app.get("/", (req, res) => {
 (0, routes_1.useTeacherStudentPerformanceTrendRoutes)(app);
 (0, routes_1.useTeacherReportCardRoutes)(app);
 (0, routes_1.useBulkImportExportRoutes)(app);
+const openApiDocument = (0, openapi_1.createOpenApiDocument)(app);
+app.get("/api-docs.json", (req, res) => {
+    res.json(openApiDocument);
+});
+app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(openApiDocument, {
+    customSiteTitle: "Oxford EMUP API Docs",
+}));
 /* ============================================================
    SERVER
 ============================================================ */

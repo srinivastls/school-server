@@ -3,6 +3,7 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 
 import { prisma } from "../config";
 import { handleErr } from "../utils";
+import { emitStudentWhatsAppEvent } from "../services/whatsappEvent.service";
 
 dayjs.extend(customParseFormat);
 
@@ -541,6 +542,20 @@ const markStudentAttendance =
           ).length,
 
       };
+
+      const statusByStudentId = new Map(
+        saved.map((item) => [item.studentId, item.status])
+      );
+      await emitStudentWhatsAppEvent({
+        schoolId,
+        service: "student_attendance",
+        studentIds: saved.map((item) => item.studentId),
+        parameters: (student) => [
+          student.name,
+          statusByStudentId.get(student.id) ?? "UNKNOWN",
+          date,
+        ],
+      });
 
       return res.status(200).json({
 

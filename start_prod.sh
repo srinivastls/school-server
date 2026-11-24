@@ -1,1 +1,1 @@
-DEPLOY_ENV=prod node dist/index.js
+DEPLOY_ENV=prod npm start

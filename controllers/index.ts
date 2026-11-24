@@ -31,3 +31,4 @@ export * from "./principalExamSubject.controller";
 export * from "./principalExamTimetable.controller";
 export * from "./principalResults.controller";
 export * from "./parentResults.controller";
+export * from "./platformWhatsApp.controller";

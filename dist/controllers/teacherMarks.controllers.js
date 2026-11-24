@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.saveTeacherMarks = exports.getTeacherMarksEntry = exports.getTeacherMarksOptions = void 0;
 const config_1 = require("../config");
 const utils_1 = require("../utils");
+const whatsappEvent_service_1 = require("../services/whatsappEvent.service");
 /* ============================================================
    GET MARKS ENTRY OPTIONS
    ============================================================ */
@@ -669,6 +670,23 @@ const saveTeacherMarks = async (req, res) => {
                 });
             }
         });
+        if (finalize) {
+            const marksByStudentId = new Map(marks.map((item) => [
+                item.studentId,
+                item.isAbsent ? "Absent" : String(item.marksObtained ?? ""),
+            ]));
+            await (0, whatsappEvent_service_1.emitStudentWhatsAppEvent)({
+                schoolId,
+                service: "student_marks",
+                studentIds: marks.map((item) => item.studentId),
+                parameters: (student) => [
+                    student.name,
+                    String(subjectId),
+                    marksByStudentId.get(student.id) ?? "",
+                    String(examSubject.maxMarks),
+                ],
+            });
+        }
         return res.status(200).json({
             message: finalize
                 ? "Marks finalized successfully."

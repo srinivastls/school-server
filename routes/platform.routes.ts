@@ -12,6 +12,8 @@ import {
   restoreSchoolController,
   deleteAcademicYearController,
   deleteSchoolController,
+  getWhatsAppSettings,
+  updateWhatsAppSettings,
 } from "../controllers";
 
 import { authJwt } from "../middlewares";
@@ -88,6 +90,18 @@ app.get(
     isSuperAdmin,
   ],
   platformController.getSchoolById
+);
+
+app.get(
+  "/api/platform/schools/:schoolId/whatsapp",
+  [verifyToken, isSuperAdmin],
+  getWhatsAppSettings
+);
+
+app.patch(
+  "/api/platform/schools/:schoolId/whatsapp",
+  [verifyToken, isSuperAdmin],
+  updateWhatsAppSettings
 );
 
 
