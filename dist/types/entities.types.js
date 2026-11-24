@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PaymentMode = exports.CouponStatus = void 0;
+exports.PaymentMode = exports.CouponDiscountType = exports.CouponStatus = void 0;
 const client_1 = require("@prisma/client");
 Object.defineProperty(exports, "PaymentMode", { enumerable: true, get: function () { return client_1.PaymentMode; } });
 /* ============================================================
@@ -11,3 +11,8 @@ var CouponStatus;
     CouponStatus["ACTIVE"] = "ACTIVE";
     CouponStatus["APPLIED"] = "APPLIED";
 })(CouponStatus || (exports.CouponStatus = CouponStatus = {}));
+var CouponDiscountType;
+(function (CouponDiscountType) {
+    CouponDiscountType["AMOUNT"] = "AMOUNT";
+    CouponDiscountType["PERCENT"] = "PERCENT";
+})(CouponDiscountType || (exports.CouponDiscountType = CouponDiscountType = {}));

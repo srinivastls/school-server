@@ -1,0 +1,29 @@
+{
+  "entryPoints": [
+    "index.ts",
+    "config",
+    "controllers",
+    "docs",
+    "middlewares",
+    "models",
+    "routes",
+    "services",
+    "types",
+    "utils.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "tsconfig": "tsconfig.json",
+  "out": "docs/reference",
+  "exclude": [
+    "**/generated/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "navigation": true,
+  "categorizeByGroup": false,
+  "name": "Oxford EMUP Server Reference",
+  "includeVersion": true,
+  "readme": "README.md"
+}

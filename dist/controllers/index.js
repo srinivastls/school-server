@@ -47,3 +47,4 @@ __exportStar(require("./principalExamSubject.controller"), exports);
 __exportStar(require("./principalExamTimetable.controller"), exports);
 __exportStar(require("./principalResults.controller"), exports);
 __exportStar(require("./parentResults.controller"), exports);
+__exportStar(require("./platformWhatsApp.controller"), exports);

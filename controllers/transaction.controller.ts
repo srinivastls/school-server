@@ -18,6 +18,7 @@ import {
 } from "../types";
 
 import { handleErr } from "../utils";
+import { emitStudentWhatsAppEvent } from "../services/whatsappEvent.service";
 
 /* ============================================================
    HELPERS
@@ -525,6 +526,19 @@ const recordTxn = async (
     /* ========================================================
        RESPONSE
     ======================================================== */
+
+    await emitStudentWhatsAppEvent({
+      schoolId,
+      service: "fee_payment_receipts",
+      studentIds: [txn.studentId],
+      parameters: (student) => [
+        student.name,
+        txn.amount,
+        txn.receiptNumber,
+        txn.date,
+        txn.paymentMode,
+      ],
+    });
 
     return res.status(200).json({
       id: txn.id,

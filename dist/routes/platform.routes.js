@@ -33,6 +33,8 @@ const usePlatformRoutes = (app) => {
         verifyToken,
         isSuperAdmin,
     ], controllers_1.platformController.getSchoolById);
+    app.get("/api/platform/schools/:schoolId/whatsapp", [verifyToken, isSuperAdmin], controllers_1.getWhatsAppSettings);
+    app.patch("/api/platform/schools/:schoolId/whatsapp", [verifyToken, isSuperAdmin], controllers_1.updateWhatsAppSettings);
     app.get("/api/platform/schools/:schoolId/academic-years/:academicYearId/deletion-preview", [verifyToken, isSuperAdmin], controllers_1.getAcademicYearDeletionPreviewController);
     app.post("/api/platform/schools/:schoolId/exports/full", [verifyToken, isSuperAdmin], controllers_1.exportSchoolController);
     app.post("/api/platform/schools/:schoolId/exports/academic-year/:academicYearId", [verifyToken, isSuperAdmin], controllers_1.exportAcademicYearController);

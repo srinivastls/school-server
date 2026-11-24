@@ -73,6 +73,11 @@ export enum CouponStatus {
   APPLIED = "APPLIED",
 }
 
+export enum CouponDiscountType {
+  AMOUNT = "AMOUNT",
+  PERCENT = "PERCENT",
+}
+
 export type CouponType = {
   id?: string;
 
@@ -83,6 +88,8 @@ export type CouponType = {
   code: string;
 
   discount: string;
+
+  discountType: CouponDiscountType;
 
   status: CouponStatus;
 };
@@ -305,4 +312,3 @@ export type ChangePasswordRequest = {
   currentPassword: string;
   newPassword: string;
 };
-

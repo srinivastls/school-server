@@ -5,6 +5,7 @@ const crypto_1 = require("crypto");
 const config_1 = require("../config");
 const client_1 = require("@prisma/client");
 const utils_1 = require("../utils");
+const whatsappEvent_service_1 = require("../services/whatsappEvent.service");
 /* ============================================================
    HELPERS
 ============================================================ */
@@ -262,6 +263,18 @@ const recordTxn = async (req, res) => {
         /* ========================================================
            RESPONSE
         ======================================================== */
+        await (0, whatsappEvent_service_1.emitStudentWhatsAppEvent)({
+            schoolId,
+            service: "fee_payment_receipts",
+            studentIds: [txn.studentId],
+            parameters: (student) => [
+                student.name,
+                txn.amount,
+                txn.receiptNumber,
+                txn.date,
+                txn.paymentMode,
+            ],
+        });
         return res.status(200).json({
             id: txn.id,
             amount: txn.amount,

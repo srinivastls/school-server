@@ -6,9 +6,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.studentcontrollers = void 0;
 const config_1 = require("../config");
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const pdfkit_1 = __importDefault(require("pdfkit"));
 const client_1 = require("@prisma/client");
 const types_1 = require("../types");
 const utils_1 = require("../utils");
+const googleDrive_service_1 = require("../services/googleDrive.service");
 /* ============================================================
    HELPERS
 ============================================================ */
@@ -17,15 +19,17 @@ const calculatePendingAmountSync = ({ student, classDetails, coupon, alreadyPaid
     const tieAmount = Number(student?.tie?.amount ?? 0);
     const beltAmount = Number(student?.belt?.amount ?? 0);
     const arrearsAmount = Number(student?.arrears?.amount ?? 0);
-    return `${Number(tuitionFee) +
+    const totalFee = Number(tuitionFee) +
         Number(textBookFee) +
         Number(noteBookFee) +
         Number(diaryFee) +
         tieAmount +
         beltAmount +
-        arrearsAmount -
-        Number(coupon?.discount ?? 0) -
-        alreadyPaid}`;
+        arrearsAmount;
+    const discount = coupon?.discountType === types_1.CouponDiscountType.PERCENT
+        ? (totalFee * Number(coupon.discount)) / 100
+        : Number(coupon?.discount ?? 0);
+    return `${totalFee - discount - alreadyPaid}`;
 };
 const getPendingAmountAsync = async (student, classDetails, coupon) => {
     if (!student.id) {
@@ -87,6 +91,467 @@ const getSchoolId = (req) => {
 const getAcademicYearId = (req) => {
     return (req.body?.academicYearId ??
         req.query?.academicYearId);
+};
+const extractGoogleDriveFileId = (url) => {
+    const queryId = url.match(/[?&]id=([^&]+)/)?.[1];
+    if (queryId)
+        return decodeURIComponent(queryId);
+    const pathId = url.match(/\/d\/([^/]+)/)?.[1];
+    return pathId ? decodeURIComponent(pathId) : undefined;
+};
+const generateBulkStudentIdCards = async (req, res) => {
+    try {
+        const schoolId = getSchoolId(req);
+        const generatedByUserId = req.userId;
+        const { studentIds, academicYearId } = req.body;
+        if (!schoolId || !generatedByUserId) {
+            return res.status(400).json({ message: "Authenticated school and user are required" });
+        }
+        if (!Array.isArray(studentIds) ||
+            studentIds.length < 1 ||
+            studentIds.length > 200 ||
+            studentIds.some((id) => typeof id !== "string")) {
+            return res.status(400).json({
+                message: "studentIds must contain between 1 and 200 student IDs",
+            });
+        }
+        const students = await config_1.prisma.student.findMany({
+            where: { schoolId, id: { in: studentIds } },
+            include: { school: true, class: true, section: true },
+            orderBy: { admissionNo: "asc" },
+        });
+        if (students.length !== studentIds.length) {
+            return res.status(404).json({
+                message: "One or more students were not found in the authenticated school",
+            });
+        }
+        const academicYear = academicYearId
+            ? await config_1.prisma.academicYear.findFirst({ where: { id: academicYearId, schoolId } })
+            : await config_1.prisma.academicYear.findFirst({
+                where: { schoolId, isCurrent: true },
+                orderBy: { startDate: "desc" },
+            });
+        if (academicYearId && !academicYear) {
+            return res.status(404).json({ message: "Academic year not found" });
+        }
+        const document = new pdfkit_1.default({ size: "A4", margin: 24 });
+        const chunks = [];
+        document.on("data", (chunk) => chunks.push(chunk));
+        const pdf = new Promise((resolve, reject) => {
+            document.on("end", () => resolve(Buffer.concat(chunks)));
+            document.on("error", reject);
+        });
+        for (let index = 0; index < students.length; index += 1) {
+            if (index > 0 && index % 8 === 0)
+                document.addPage();
+            const student = students[index];
+            const slot = index % 8;
+            const x = 24 + (slot % 2) * 275;
+            const y = 28 + Math.floor(slot / 2) * 185;
+            const previousCard = await config_1.prisma.iDCard.findFirst({
+                where: { schoolId, studentId: student.id, isActive: true },
+                orderBy: { version: "desc" },
+            });
+            const version = (previousCard?.version ?? 0) + 1;
+            let photoBuffer;
+            const fileId = student.photoUrl
+                ? extractGoogleDriveFileId(student.photoUrl)
+                : undefined;
+            if (fileId)
+                photoBuffer = await (0, googleDrive_service_1.downloadGoogleDriveFileToBuffer)(fileId);
+            document.roundedRect(x, y, 250, 170, 8).lineWidth(1)
+                .strokeColor("#1f4e79").stroke();
+            document.rect(x + 1, y + 1, 248, 32).fill("#1f4e79");
+            document.fillColor("#fff").fontSize(11).font("Helvetica-Bold")
+                .text(student.school.name, x + 10, y + 10, { width: 230, align: "center" });
+            document.fillColor("#1f4e79").fontSize(8).text("STUDENT ID CARD", x + 10, y + 44, {
+                width: 230, align: "center",
+            });
+            document.rect(x + 14, y + 61, 62, 70).lineWidth(0.5).strokeColor("#9aa7b2").stroke();
+            if (photoBuffer) {
+                document.image(photoBuffer, x + 17, y + 64, { fit: [56, 64] });
+            }
+            else {
+                document.fillColor("#68737d").fontSize(7).text("PHOTO", x + 14, y + 92, {
+                    width: 62, align: "center",
+                });
+            }
+            const field = (label, value, fieldY) => {
+                document.fillColor("#4b5563").font("Helvetica-Bold").fontSize(7)
+                    .text(label, x + 88, fieldY, { width: 58 });
+                document.fillColor("#111827").font("Helvetica").fontSize(8)
+                    .text(value || "-", x + 148, fieldY, { width: 90 });
+            };
+            field("Name", student.name, y + 63);
+            field("Admission No.", student.admissionNo, y + 78);
+            field("Class", student.class.displayName, y + 93);
+            field("Section", student.section.sectionName, y + 108);
+            field("DOB", student.dob, y + 123);
+            document.fillColor("#4b5563").fontSize(6).text(`${academicYear?.name ?? "Academic year"} | Card v${version}`, x + 10, y + 148, { width: 230, align: "center" });
+            await config_1.prisma.iDCard.updateMany({
+                where: { schoolId, studentId: student.id, isActive: true },
+                data: { isActive: false },
+            });
+            await config_1.prisma.iDCard.create({
+                data: {
+                    schoolId,
+                    studentId: student.id,
+                    cardType: "STUDENT",
+                    academicYearId: academicYear?.id,
+                    pdfUrl: "/api/students/id-cards/bulk",
+                    version,
+                    reissueReason: previousCard ? client_1.IDCardReissueReason.DATA_CHANGE : client_1.IDCardReissueReason.INITIAL,
+                    generatedByUserId,
+                },
+            });
+        }
+        document.end();
+        const pdfBuffer = await pdf;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", 'attachment; filename="student-id-cards.pdf"');
+        return res.send(pdfBuffer);
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
+};
+const generateStudentIdCard = async (req, res) => {
+    try {
+        const schoolId = getSchoolId(req);
+        const studentId = req.params.studentId;
+        const academicYearId = getAcademicYearId(req);
+        const generatedByUserId = req.userId;
+        if (!schoolId || !studentId || !generatedByUserId) {
+            return res.status(400).json({
+                message: "Authenticated school, user and studentId are required",
+            });
+        }
+        const student = await config_1.prisma.student.findFirst({
+            where: { id: studentId, schoolId },
+            include: {
+                school: true,
+                class: true,
+                section: true,
+            },
+        });
+        if (!student) {
+            return res.status(404).json({ message: "Student not found" });
+        }
+        const uploadedPhoto = req.file;
+        let photoUrl = student.photoUrl;
+        let photoBuffer = uploadedPhoto?.buffer;
+        if (uploadedPhoto) {
+            if (!["image/jpeg", "image/png", "image/webp"].includes(uploadedPhoto.mimetype)) {
+                return res.status(400).json({
+                    message: "photo must be a JPEG, PNG or WebP image",
+                });
+            }
+            if (uploadedPhoto.size > 5 * 1024 * 1024) {
+                return res.status(400).json({ message: "photo cannot exceed 5 MB" });
+            }
+            const photo = await (0, googleDrive_service_1.uploadStudentPhotoToGoogleDrive)(uploadedPhoto.buffer, `student-${student.admissionNo}-${Date.now()}`, uploadedPhoto.mimetype);
+            if (!photo.webViewLink) {
+                throw new Error("Google Drive photo upload returned no view URL");
+            }
+            photoUrl = photo.webViewLink;
+            await config_1.prisma.student.update({
+                where: { id: student.id },
+                data: { photoUrl },
+            });
+        }
+        if (!photoBuffer && photoUrl) {
+            const driveFileId = extractGoogleDriveFileId(photoUrl);
+            if (driveFileId) {
+                photoBuffer = await (0, googleDrive_service_1.downloadGoogleDriveFileToBuffer)(driveFileId);
+            }
+        }
+        let academicYear;
+        if (academicYearId) {
+            academicYear = await config_1.prisma.academicYear.findFirst({
+                where: { id: academicYearId, schoolId },
+            });
+            if (!academicYear) {
+                return res.status(404).json({ message: "Academic year not found" });
+            }
+        }
+        else {
+            academicYear = await config_1.prisma.academicYear.findFirst({
+                where: { schoolId, isCurrent: true },
+                orderBy: { startDate: "desc" },
+            });
+        }
+        const previousCard = await config_1.prisma.iDCard.findFirst({
+            where: {
+                schoolId,
+                studentId,
+                isActive: true,
+            },
+            orderBy: { version: "desc" },
+        });
+        const version = (previousCard?.version ?? 0) + 1;
+        const cardUrl = `/api/student/${studentId}/id-card`;
+        const document = new pdfkit_1.default({
+            size: [242, 153],
+            margin: 0,
+        });
+        const chunks = [];
+        document.on("data", (chunk) => chunks.push(chunk));
+        const pdf = new Promise((resolve, reject) => {
+            document.on("end", () => resolve(Buffer.concat(chunks)));
+            document.on("error", reject);
+        });
+        document
+            .roundedRect(8, 8, 226, 137, 8)
+            .lineWidth(1)
+            .strokeColor("#1f4e79")
+            .stroke();
+        document
+            .rect(9, 9, 224, 29)
+            .fill("#1f4e79");
+        document
+            .fillColor("#ffffff")
+            .fontSize(11)
+            .font("Helvetica-Bold")
+            .text(student.school.name, 17, 16, { width: 208, align: "center" });
+        document
+            .fillColor("#1f4e79")
+            .fontSize(8)
+            .font("Helvetica-Bold")
+            .text("STUDENT ID CARD", 17, 44, { width: 208, align: "center" });
+        document
+            .rect(18, 61, 58, 65)
+            .lineWidth(0.5)
+            .strokeColor("#9aa7b2")
+            .stroke();
+        if (photoBuffer) {
+            document
+                .image(photoBuffer, 20, 63, {
+                fit: [54, 61],
+                align: "center",
+                valign: "center",
+            });
+        }
+        document
+            .fillColor("#68737d")
+            .font("Helvetica")
+            .fontSize(7)
+            .text(photoBuffer ? "" : "PHOTO", 18, 89, { width: 58, align: "center" });
+        const field = (label, value, y) => {
+            document
+                .fillColor("#4b5563")
+                .font("Helvetica-Bold")
+                .fontSize(7)
+                .text(label, 86, y, { width: 50 });
+            document
+                .fillColor("#111827")
+                .font("Helvetica")
+                .fontSize(8)
+                .text(value || "-", 137, y, { width: 85 });
+        };
+        const generateBulkStudentIdCards = async (req, res) => {
+            try {
+                const schoolId = getSchoolId(req);
+                const generatedByUserId = req.userId;
+                const { studentIds, academicYearId } = req.body;
+                if (!schoolId || !generatedByUserId) {
+                    return res.status(400).json({
+                        message: "Authenticated school and user are required",
+                    });
+                }
+                if (!Array.isArray(studentIds) ||
+                    studentIds.length === 0 ||
+                    studentIds.some((id) => typeof id !== "string") ||
+                    studentIds.length > 200) {
+                    return res.status(400).json({
+                        message: "studentIds must contain between 1 and 200 student IDs",
+                    });
+                }
+                const students = await config_1.prisma.student.findMany({
+                    where: {
+                        schoolId,
+                        id: { in: studentIds },
+                    },
+                    include: { school: true, class: true, section: true },
+                    orderBy: { admissionNo: "asc" },
+                });
+                if (students.length !== studentIds.length) {
+                    return res.status(404).json({
+                        message: "One or more students were not found in the authenticated school",
+                    });
+                }
+                const academicYear = academicYearId
+                    ? await config_1.prisma.academicYear.findFirst({
+                        where: { id: academicYearId, schoolId },
+                    })
+                    : await config_1.prisma.academicYear.findFirst({
+                        where: { schoolId, isCurrent: true },
+                        orderBy: { startDate: "desc" },
+                    });
+                if (academicYearId && !academicYear) {
+                    return res.status(404).json({ message: "Academic year not found" });
+                }
+                const document = new pdfkit_1.default({
+                    size: "A4",
+                    margin: 24,
+                });
+                const chunks = [];
+                document.on("data", (chunk) => chunks.push(chunk));
+                const pdf = new Promise((resolve, reject) => {
+                    document.on("end", () => resolve(Buffer.concat(chunks)));
+                    document.on("error", reject);
+                });
+                const cardsPerPage = 8;
+                const cardWidth = 250;
+                const cardHeight = 170;
+                const gapX = 25;
+                const gapY = 18;
+                for (let index = 0; index < students.length; index += 1) {
+                    const student = students[index];
+                    if (index > 0 && index % cardsPerPage === 0)
+                        document.addPage();
+                    const pageIndex = index % cardsPerPage;
+                    const x = 24 + (pageIndex % 2) * (cardWidth + gapX);
+                    const y = 28 + Math.floor(pageIndex / 2) * (cardHeight + gapY);
+                    const previousCard = await config_1.prisma.iDCard.findFirst({
+                        where: { schoolId, studentId: student.id, isActive: true },
+                        orderBy: { version: "desc" },
+                    });
+                    const version = (previousCard?.version ?? 0) + 1;
+                    let photoBuffer;
+                    if (student.photoUrl) {
+                        const driveFileId = extractGoogleDriveFileId(student.photoUrl);
+                        if (driveFileId) {
+                            photoBuffer = await (0, googleDrive_service_1.downloadGoogleDriveFileToBuffer)(driveFileId);
+                        }
+                    }
+                    document
+                        .roundedRect(x, y, cardWidth, cardHeight, 8)
+                        .lineWidth(1)
+                        .strokeColor("#1f4e79")
+                        .stroke();
+                    document.rect(x + 1, y + 1, cardWidth - 2, 32).fill("#1f4e79");
+                    document
+                        .fillColor("#ffffff")
+                        .fontSize(11)
+                        .font("Helvetica-Bold")
+                        .text(student.school.name, x + 10, y + 10, {
+                        width: cardWidth - 20,
+                        align: "center",
+                    });
+                    document
+                        .fillColor("#1f4e79")
+                        .fontSize(8)
+                        .text("STUDENT ID CARD", x + 10, y + 44, {
+                        width: cardWidth - 20,
+                        align: "center",
+                    });
+                    document
+                        .rect(x + 14, y + 61, 62, 70)
+                        .lineWidth(0.5)
+                        .strokeColor("#9aa7b2")
+                        .stroke();
+                    if (photoBuffer) {
+                        document.image(photoBuffer, x + 17, y + 64, {
+                            fit: [56, 64],
+                            align: "center",
+                            valign: "center",
+                        });
+                    }
+                    else {
+                        document
+                            .fillColor("#68737d")
+                            .font("Helvetica")
+                            .fontSize(7)
+                            .text("PHOTO", x + 14, y + 92, { width: 62, align: "center" });
+                    }
+                    const field = (label, value, fieldY) => {
+                        document
+                            .fillColor("#4b5563")
+                            .font("Helvetica-Bold")
+                            .fontSize(7)
+                            .text(label, x + 88, fieldY, { width: 58 });
+                        document
+                            .fillColor("#111827")
+                            .font("Helvetica")
+                            .fontSize(8)
+                            .text(value || "-", x + 148, fieldY, { width: 90 });
+                    };
+                    field("Name", student.name, y + 63);
+                    field("Admission No.", student.admissionNo, y + 78);
+                    field("Class", student.class.displayName, y + 93);
+                    field("Section", student.section.sectionName, y + 108);
+                    field("DOB", student.dob, y + 123);
+                    document
+                        .fillColor("#4b5563")
+                        .fontSize(6)
+                        .font("Helvetica")
+                        .text(`${academicYear?.name ?? "Academic year"} | Card v${version}`, x + 10, y + 148, { width: cardWidth - 20, align: "center" });
+                    await config_1.prisma.iDCard.updateMany({
+                        where: { schoolId, studentId: student.id, isActive: true },
+                        data: { isActive: false },
+                    });
+                    await config_1.prisma.iDCard.create({
+                        data: {
+                            schoolId,
+                            studentId: student.id,
+                            cardType: "STUDENT",
+                            academicYearId: academicYear?.id,
+                            pdfUrl: `/api/students/id-cards/bulk`,
+                            version,
+                            reissueReason: previousCard
+                                ? client_1.IDCardReissueReason.DATA_CHANGE
+                                : client_1.IDCardReissueReason.INITIAL,
+                            generatedByUserId,
+                        },
+                    });
+                }
+                document.end();
+                const pdfBuffer = await pdf;
+                res.setHeader("Content-Type", "application/pdf");
+                res.setHeader("Content-Disposition", "attachment; filename=\"student-id-cards.pdf\"");
+                return res.send(pdfBuffer);
+            }
+            catch (err) {
+                return (0, utils_1.handleErr)(err, res);
+            }
+        };
+        field("Name", student.name, 61);
+        field("Admission No.", student.admissionNo, 74);
+        field("Class", student.class.displayName, 87);
+        field("Section", student.section.sectionName, 100);
+        field("DOB", student.dob, 113);
+        document
+            .fillColor("#4b5563")
+            .fontSize(6)
+            .font("Helvetica")
+            .text(`${academicYear?.name ?? "Academic year"}  |  Card v${version}`, 17, 132, { width: 208, align: "center" });
+        document.end();
+        const pdfBuffer = await pdf;
+        await config_1.prisma.iDCard.updateMany({
+            where: { schoolId, studentId, isActive: true },
+            data: { isActive: false },
+        });
+        await config_1.prisma.iDCard.create({
+            data: {
+                schoolId,
+                studentId,
+                cardType: "STUDENT",
+                academicYearId: academicYear?.id,
+                pdfUrl: cardUrl,
+                version,
+                reissueReason: previousCard
+                    ? client_1.IDCardReissueReason.DATA_CHANGE
+                    : client_1.IDCardReissueReason.INITIAL,
+                generatedByUserId,
+            },
+        });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="student-${student.admissionNo}-id-card.pdf"`);
+        return res.send(pdfBuffer);
+    }
+    catch (err) {
+        return (0, utils_1.handleErr)(err, res);
+    }
 };
 /* ============================================================
    PARENT INTERNAL EMAIL
@@ -1376,4 +1841,6 @@ exports.studentcontrollers = {
     groupStudentsByClassAndCount,
     getStudentRegistrationOptions,
     promoteDemote,
+    generateStudentIdCard,
+    generateBulkStudentIdCards,
 };

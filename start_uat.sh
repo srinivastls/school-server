@@ -1,1 +1,1 @@
-DEPLOY_ENV=uat node dist/index.js
+DEPLOY_ENV=uat npm start

@@ -3,6 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.uploadStudentPhotoToGoogleDrive = uploadStudentPhotoToGoogleDrive;
+exports.downloadGoogleDriveFileToBuffer = downloadGoogleDriveFileToBuffer;
 exports.uploadBackupToGoogleDrive = uploadBackupToGoogleDrive;
 exports.downloadBackupFromGoogleDrive = downloadBackupFromGoogleDrive;
 exports.deleteBackupFromGoogleDrive = deleteBackupFromGoogleDrive;
@@ -70,6 +72,14 @@ function getBackupFolderId() {
     }
     return folderId;
 }
+function getStudentPhotoFolderId() {
+    const folderId = process.env.GOOGLE_DRIVE_STUDENT_PHOTO_FOLDER_ID?.trim() ||
+        process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID?.trim();
+    if (!folderId) {
+        throw new Error("GOOGLE_DRIVE_STUDENT_PHOTO_FOLDER_ID or GOOGLE_DRIVE_BACKUP_FOLDER_ID must be configured.");
+    }
+    return folderId;
+}
 const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
     ?.trim()
     .replace(/^["']|["']$/g, "")
@@ -104,6 +114,70 @@ function getDriveClient() {
         version: "v3",
         auth,
     });
+}
+async function uploadStudentPhotoToGoogleDrive(buffer, fileName, mimeType) {
+    if (!buffer.length) {
+        throw new Error("Student photo is empty");
+    }
+    const folderId = getStudentPhotoFolderId();
+    const drive = getDriveClient();
+    try {
+        const folder = await drive.files.get({
+            fileId: folderId,
+            fields: "id,mimeType",
+        });
+        if (folder.data.mimeType !== "application/vnd.google-apps.folder") {
+            throw new Error(`GOOGLE_DRIVE_STUDENT_PHOTO_FOLDER_ID is not a folder: ${folderId}`);
+        }
+        const response = await drive.files.create({
+            requestBody: {
+                name: fileName,
+                mimeType,
+                parents: [folderId],
+            },
+            media: {
+                mimeType,
+                body: bufferToStream(buffer),
+            },
+            fields: "id,name,webViewLink,webContentLink",
+        });
+        if (!response.data.id) {
+            throw new Error("Google Drive photo upload returned no file ID");
+        }
+        await drive.permissions.create({
+            fileId: response.data.id,
+            requestBody: { role: "reader", type: "anyone" },
+        });
+        return {
+            fileId: response.data.id,
+            fileName: response.data.name || fileName,
+            webViewLink: `https://drive.google.com/uc?export=view&id=${response.data.id}`,
+            webContentLink: response.data.webContentLink || undefined,
+        };
+    }
+    catch (error) {
+        const message = error?.response?.data?.error?.message ||
+            error?.message ||
+            "Unknown Google Drive error.";
+        throw new Error(`Google Drive photo upload failed: ${message}`);
+    }
+}
+async function downloadGoogleDriveFileToBuffer(fileId) {
+    const drive = getDriveClient();
+    try {
+        const response = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+        return Buffer.from(response.data);
+    }
+    catch (error) {
+        const message = error?.response?.data?.error?.message ||
+            error?.message ||
+            "Unknown Google Drive error.";
+        throw new Error(`Google Drive photo download failed: ${message}`);
+    }
+}
+function bufferToStream(buffer) {
+    const { Readable } = require("stream");
+    return Readable.from(buffer);
 }
 // ------------------------------------------------------------
 // UPLOAD BACKUP
